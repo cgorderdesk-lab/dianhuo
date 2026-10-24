@@ -65,14 +65,10 @@
       display: flex; justify-content: space-between; align-items: center; font-size: 16px;
     }
     #item-list li:last-child { border-bottom: none; }
-    .item-name { flex: 1; word-break: break-all; }
-    .item-qty {
-      font-weight: 700; color: #007aff; margin: 0 12px; font-size: 18px; min-width: 40px;
-      text-align: right;
-    }
+    .item-name { flex: 1; word-break: break-all; line-height: 1.4; }
     .delete-btn {
       background: none; border: none; color: #ff3b30; font-size: 20px;
-      cursor: pointer; padding: 4px 8px;
+      cursor: pointer; padding: 4px 8px; margin-left: 12px;
     }
     .empty-state { padding: 32px; text-align: center; color: #86868b; font-size: 15px; }
     .toast {
@@ -97,8 +93,8 @@
   <div class="warehouse-selector" id="warehouse-selector"></div>
 
   <div class="input-section">
-    <div class="input-tip">💡 直接用键盘听写，说完按键盘右下角的“发送”即可连续录入。</div>
-    <textarea id="transcript" placeholder="例如：苹果 10" enterkeyhint="send"></textarea>
+    <div class="input-tip">💡 说你想记的内容，按键盘右下角“发送”连续录入。</div>
+    <textarea id="transcript" placeholder="直接输入或语音听写..." enterkeyhint="send"></textarea>
     <div class="btn-row">
       <button class="btn btn-primary" id="add-btn">添加</button>
     </div>
@@ -110,7 +106,7 @@
       <span id="item-count">0 项</span>
     </div>
     <ul id="item-list"></ul>
-    <div class="empty-state" id="empty-state">还没有点货记录<br>输入后点击“添加”</div>
+    <div class="empty-state" id="empty-state">还没有记录<br>输入后点击“添加”</div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -177,10 +173,12 @@
       } else {
         emptyState.style.display = 'none';
         filtered.forEach((it) => {
+          // 兼容老数据：如果之前拆分过，把名字和数字合并显示；新数据直接显示完整内容
+          const displayText = it.qty ? `${it.name} ${it.qty}` : it.name;
+          
           const li = document.createElement('li');
           li.innerHTML = `
-            <span class="item-name">${escapeHtml(it.name)}</span>
-            <span class="item-qty">${it.qty}</span>
+            <span class="item-name">${escapeHtml(displayText)}</span>
             <button class="delete-btn" data-index="${items.indexOf(it)}" aria-label="删除">✕</button>
           `;
           itemList.appendChild(li);
@@ -228,24 +226,18 @@
       const trimmed = text.trim();
       if (!trimmed) return;
 
-      const match = trimmed.match(/^(.+?)\s*(\d+(?:\.\d+)?)\s*(?:个|箱|件|包|瓶|袋)?$/);
-      let name, qty;
-      if (match) {
-        name = match[1].trim();
-        qty = parseFloat(match[2]);
-      } else {
-        name = trimmed;
-        qty = 1;
-      }
-
-      if (!name) return;
-
-      items.push({ name: name, qty: qty, warehouse: currentWarehouse });
+      // 【修改点】不再使用正则拆分，直接把整段文字作为一个记录存下来
+      items.push({ 
+        name: trimmed, 
+        qty: '', // 留空
+        warehouse: currentWarehouse 
+      });
+      
       transcript.value = '';
       render();
     }
 
-    // 【关键修复 1】阻止按钮在触摸时夺走输入框的焦点
+    // 阻止按钮在触摸时夺走输入框的焦点，防止键盘收起
     addBtn.addEventListener('mousedown', e => e.preventDefault());
     addBtn.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
 
@@ -258,7 +250,6 @@
       if (e.key === 'Enter') {
         e.preventDefault(); // 阻止换行
         parseAndAdd(transcript.value);
-        // 键盘发送后，焦点天然保留，不需要额外 focus
       }
     });
 
