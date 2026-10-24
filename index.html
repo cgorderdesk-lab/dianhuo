@@ -5,108 +5,174 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="点货">
+  <meta name="apple-mobile-web-app-title" content="点货系统">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23007aff'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='system-ui'>点</text></svg>">
-  <title>点货</title>
+  <title>点货系统</title>
   <style>
+    :root { --primary: #007aff; --bg: #f5f5f7; --text: #1d1d1f; --card: #ffffff; --success: #34c759; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0; padding: 16px; padding-top: max(16px, env(safe-area-inset-top));
-      background: #f5f5f7; color: #1d1d1f; min-height: 100vh;
+      margin: 0; padding-bottom: 80px; background: var(--bg); color: var(--text);
+      min-height: 100vh;
     }
-    h1 { font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; justify-content: space-between; }
-    .edit-wh-btn {
-      font-size: 14px; padding: 6px 12px; background: #e5e5ea; border: none;
-      border-radius: 8px; color: #1d1d1f; font-weight: 500; cursor: pointer;
+    h1 { font-size: 22px; margin: 16px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
+    
+    /* 页面切换 */
+    .page { display: none; padding: 0 16px; padding-top: max(16px, env(safe-area-inset-top)); }
+    .page.active { display: block; }
+    
+    /* 底部导航栏 */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+      background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+      border-top: 1px solid #e5e5ea; display: flex; z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom);
     }
-    .warehouse-selector {
-      display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #86868b; font-size: 12px; border: none; background: none; cursor: pointer;
     }
-    .warehouse-selector button.wh-btn {
-      flex: 1; min-width: 80px; padding: 12px; border: 2px solid #d1d1d6; border-radius: 12px;
-      background: white; font-size: 16px; font-weight: 500; color: #1d1d1f; cursor: pointer;
-      transition: all 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .warehouse-selector button.wh-btn.active {
-      border-color: #007aff; background: #007aff; color: white;
-    }
-    .input-section {
-      background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    }
-    .input-tip { font-size: 13px; color: #86868b; margin-bottom: 8px; }
-    #transcript {
-      width: 100%; min-height: 80px; padding: 12px; border: 1.5px solid #d1d1d6;
-      border-radius: 12px; font-size: 18px; line-height: 1.5; resize: none;
-      font-family: inherit; background: #fafafa; margin-bottom: 12px;
-    }
-    #transcript:focus { outline: none; border-color: #007aff; background: white; }
-    .btn-row { display: flex; gap: 10px; }
-    .btn {
-      flex: 1; padding: 14px; border: none; border-radius: 12px; font-size: 16px;
-      font-weight: 600; cursor: pointer; transition: opacity 0.15s;
-    }
+    .nav-item.active { color: var(--primary); font-weight: bold; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; }
+
+    /* 通用卡片与按钮 */
+    .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+    .btn { padding: 14px 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity 0.15s; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-block { width: 100%; }
     .btn:active { opacity: 0.7; }
-    .btn-primary { background: #007aff; color: white; }
-    .list-section {
-      background: white; border-radius: 16px; overflow: hidden;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    
+    /* 表单输入 */
+    textarea {
+      width: 100%; padding: 12px; border: 1.5px solid #d1d1d6; border-radius: 10px;
+      font-size: 16px; font-family: inherit; background: #fafafa; margin-bottom: 12px; resize: vertical;
     }
-    .list-header {
-      padding: 14px 16px; font-weight: 600; font-size: 15px;
-      background: #fafafa; border-bottom: 1px solid #e5e5ea;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .list-header span { color: #86868b; font-weight: 400; }
-    #item-list { list-style: none; margin: 0; padding: 0; }
-    #item-list li {
-      padding: 14px 16px; border-bottom: 1px solid #f0f0f0;
-      display: flex; justify-content: space-between; align-items: center; font-size: 16px;
-    }
-    #item-list li:last-child { border-bottom: none; }
-    .item-name { flex: 1; word-break: break-all; line-height: 1.4; }
-    .delete-btn {
-      background: none; border: none; color: #ff3b30; font-size: 20px;
-      cursor: pointer; padding: 4px 8px; margin-left: 12px;
-    }
-    .empty-state { padding: 32px; text-align: center; color: #86868b; font-size: 15px; }
-    .toast {
-      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-      background: #1d1d1f; color: white; padding: 12px 24px; border-radius: 12px;
-      font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none;
-      z-index: 100;
-    }
+    textarea:focus { outline: none; border-color: var(--primary); background: white; }
+    
+    /* 列表样式 */
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { padding: 12px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+    li:last-child { border-bottom: none; }
+    .delete-btn { background: none; border: none; color: #ff3b30; font-size: 18px; padding: 8px; cursor: pointer; }
+
+    /* 仓库选择 */
+    .warehouse-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .wh-btn { flex: 1; min-width: 80px; padding: 10px; border: 2px solid #d1d1d6; border-radius: 10px; background: white; font-size: 15px; font-weight: 500; color: #1d1d1f; }
+    .wh-btn.active { border-color: var(--primary); background: var(--primary); color: white; }
+
+    /* ======= 表格式转换结果样式 ======= */
+    .table-container { background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e5e5ea; }
+    .result-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    .result-table th, .result-table td { padding: 10px 8px; border-bottom: 1px solid #e5e5ea; vertical-align: middle; }
+    .result-table th { background: #f5f5f7; color: #86868b; font-weight: 600; white-space: nowrap; border-bottom: 2px solid #d1d1d6; }
+    .result-table tr:hover { background: #fafafa; }
+    .result-table td { white-space: nowrap; }
+    
+    /* 表格内的输入框 */
+    .result-table input { width: 100%; padding: 8px 6px; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 14px; background: #fafafa; transition: border-color 0.2s; box-sizing: border-box; }
+    .result-table input:focus { border-color: var(--primary); outline: none; background: white; }
+    .result-table .inp-code { min-width: 90px; color: #333; }
+    .result-table .inp-qty { min-width: 70px; font-weight: bold; color: var(--primary); font-size: 15px; text-align: center; }
+    .result-table .inp-rate { min-width: 60px; text-align: center; }
+    
+    /* 列宽控制 */
+    .col-original { width: 30%; min-width: 120px; word-break: break-all; white-space: normal !important; }
+    .col-code { width: 25%; }
+    .col-qty { width: 22%; }
+    .col-rate { width: 23%; }
+
+    /* 设置页表格 */
+    .setting-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .setting-row input { margin-bottom: 0; flex: 1; padding: 8px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 15px;}
+    .setting-row button { width: 48px; flex-shrink: 0; background: #ff3b30; color: white; border: none; border-radius: 8px; font-size: 20px; }
+    .setting-row button.add { background: var(--primary); }
+
+    .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
     .toast.show { opacity: 1; }
-    @supports (padding-bottom: env(safe-area-inset-bottom)) {
-      body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-    }
   </style>
 </head>
 <body>
 
-  <h1>
-    📦 点货
-    <button class="edit-wh-btn" id="rename-wh-btn">✏️ 改仓名</button>
-  </h1>
+  <!-- ================= 页面 1：点货页 ================= -->
+  <div id="page-pointing" class="page active">
+    <h1>
+      📦 点货
+      <button id="rename-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 改仓名</button>
+    </h1>
+    <div class="warehouse-selector" id="warehouse-selector"></div>
+    
+    <div class="card">
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">💡 听写后按键盘右下角“发送”</div>
+      <textarea id="transcript" placeholder="例如：72裝橙九箱、紅毛50K..." enterkeyhint="send" rows="3"></textarea>
+      <button class="btn btn-primary btn-block" id="add-btn">添加记录</button>
+      <button class="btn btn-success btn-block" id="go-convert-btn" style="margin-top: 10px;">👉 去转换页核对</button>
+    </div>
 
-  <div class="warehouse-selector" id="warehouse-selector"></div>
-
-  <div class="input-section">
-    <div class="input-tip">💡 说你想记的内容，按键盘右下角“发送”连续录入。</div>
-    <textarea id="transcript" placeholder="直接输入或语音听写..." enterkeyhint="send"></textarea>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="add-btn">添加</button>
+    <div class="card" style="padding: 0;">
+      <div style="padding: 12px 16px; border-bottom: 1px solid #e5e5ea; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between;">
+        <span id="list-title">已点记录</span>
+        <span id="item-count" style="color: #86868b; font-weight: normal; font-size: 14px;">0 条</span>
+      </div>
+      <ul id="item-list" style="padding: 0 16px;"></ul>
     </div>
   </div>
 
-  <div class="list-section">
-    <div class="list-header">
-      <span id="list-title">已点货物</span>
-      <span id="item-count">0 项</span>
+  <!-- ================= 页面 2：转换页 ================= -->
+  <div id="page-convert" class="page">
+    <h1>🔄 转换核对</h1>
+    <div class="warehouse-selector" id="convert-warehouse-selector"></div>
+    
+    <div class="card">
+      <div style="font-size: 14px; color: #555; margin-bottom: 8px; font-weight: bold;">📝 点货内容（可修改）</div>
+      <textarea id="convert-textarea" rows="4" placeholder="第一页的内容会显示在这里，每行一条"></textarea>
+      <button class="btn btn-primary btn-block" id="execute-convert-btn">🔄 执行转换</button>
     </div>
-    <ul id="item-list"></ul>
-    <div class="empty-state" id="empty-state">还没有记录<br>输入后点击“添加”</div>
+
+    <div class="card" style="padding: 0;">
+      <div style="padding: 12px 16px; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; border-bottom: 1px solid #e5e5ea;">
+        📊 转换结果
+      </div>
+      <div id="convert-results" class="table-container" style="border-radius: 0 0 16px 16px; border: none;">
+        <div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 页面 3：设置页 ================= -->
+  <div id="page-settings" class="page">
+    <h1>⚙️ 记忆数据</h1>
+    
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">🏷️ 货物名 ↔ ITEM CODE</h3>
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">在这里填写的 CODE 会绑定到对应的货物上。</div>
+      <ul id="item-code-list" style="padding: 0; margin-bottom: 12px;"></ul>
+      <div class="setting-row">
+        <input type="text" id="new-item-name" placeholder="货物名（如：橙）">
+        <input type="text" id="new-item-code" placeholder="ITEM CODE">
+        <button class="add" id="add-item-btn">+</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">⚖️ 专属倍率记忆</h3>
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">系统在转换页自动记录的（品名+单位）专属倍率。</div>
+      <ul id="item-rate-list" style="padding: 0; margin-bottom: 12px;"></ul>
+    </div>
+  </div>
+
+  <!-- 底部导航 -->
+  <div class="bottom-nav">
+    <button class="nav-item active" data-target="page-pointing">
+      <span class="nav-icon">📝</span>点货
+    </button>
+    <button class="nav-item" data-target="page-convert">
+      <span class="nav-icon">🔄</span>转换
+    </button>
+    <button class="nav-item" data-target="page-settings">
+      <span class="nav-icon">⚙️</span>设置
+    </button>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -115,84 +181,33 @@
   (function() {
     'use strict';
 
-    const STORAGE_KEY = 'dianhuo_data_v2';
+    // 状态数据
+    const STORAGE_KEY = 'dianhuo_data_v7'; // 升级版本号，避免旧数据干扰
     let warehouses = ['A仓', 'B仓', 'C仓'];
     let currentWarehouse = 'A仓';
     let items = []; 
+    let itemCodes = {}; // 货物名 -> CODE
+    let itemRates = {}; // 专属倍率记录 (key: 货名_单位) 例如 { '72裝橙_箱': 72 }
 
     const $ = id => document.getElementById(id);
-    const warehouseSelector = $('warehouse-selector');
-    const transcript = $('transcript');
-    const addBtn = $('add-btn');
-    const itemList = $('item-list');
-    const emptyState = $('empty-state');
-    const listTitle = $('list-title');
-    const itemCount = $('item-count');
     const toastEl = $('toast');
-    const renameWhBtn = $('rename-wh-btn');
 
-    function save() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
-          warehouses: warehouses, 
-          warehouse: currentWarehouse, 
-          items: items 
-        }));
-      } catch (e) {}
-    }
-
-    function load() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('dianhuo_data_v1');
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        if (data.warehouses && Array.isArray(data.warehouses)) warehouses = data.warehouses;
-        if (data.warehouse) currentWarehouse = data.warehouse;
-        if (Array.isArray(data.items)) items = data.items;
-        if (!warehouses.includes(currentWarehouse)) warehouses.push(currentWarehouse);
-      } catch (e) {}
-    }
-
-    function render() {
-      warehouseSelector.innerHTML = '';
-      warehouses.forEach(wh => {
-        const btn = document.createElement('button');
-        btn.className = 'wh-btn' + (wh === currentWarehouse ? ' active' : '');
-        btn.textContent = wh;
-        btn.dataset.wh = wh;
-        warehouseSelector.appendChild(btn);
-      });
-
-      listTitle.textContent = currentWarehouse + ' · 已点货物';
-      const filtered = items.filter(it => it.warehouse === currentWarehouse);
-      itemCount.textContent = filtered.length + ' 项';
-
-      itemList.innerHTML = '';
-      if (filtered.length === 0) {
-        emptyState.style.display = 'block';
-      } else {
-        emptyState.style.display = 'none';
-        filtered.forEach((it) => {
-          // 兼容老数据：如果之前拆分过，把名字和数字合并显示；新数据直接显示完整内容
-          const displayText = it.qty ? `${it.name} ${it.qty}` : it.name;
-          
-          const li = document.createElement('li');
-          li.innerHTML = `
-            <span class="item-name">${escapeHtml(displayText)}</span>
-            <button class="delete-btn" data-index="${items.indexOf(it)}" aria-label="删除">✕</button>
-          `;
-          itemList.appendChild(li);
-        });
+    // 工具：中文数字转阿拉伯
+    function cnToNum(cn) {
+      if (!cn) return 0;
+      if (!isNaN(cn)) return parseFloat(cn);
+      const cnNums = { '零':0, '一':1, '二':2, '两':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 };
+      if (cn === '十') return 10;
+      if (cn.includes('十')) {
+        const parts = cn.split('十');
+        const tens = parts[0] ? cnNums[parts[0]] : 1;
+        const ones = parts[1] ? cnNums[parts[1]] : 0;
+        return tens * 10 + ones;
       }
-      save();
+      return cnNums[cn] || 0;
     }
 
-    function escapeHtml(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    }
-
+    // 工具：Toast
     let toastTimer;
     function showToast(msg) {
       toastEl.textContent = msg;
@@ -201,14 +216,350 @@
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
     }
 
-    warehouseSelector.addEventListener('click', e => {
-      const btn = e.target.closest('.wh-btn');
-      if (!btn) return;
-      currentWarehouse = btn.dataset.wh;
-      render();
+    // 存储与读取
+    function save() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouses, currentWarehouse, items, itemCodes, itemRates }));
+      } catch(e){}
+    }
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d.warehouses) warehouses = d.warehouses;
+        if (d.currentWarehouse) currentWarehouse = d.currentWarehouse;
+        if (d.items) items = d.items;
+        if (d.itemCodes) itemCodes = d.itemCodes;
+        if (d.itemRates) itemRates = d.itemRates;
+        if (!warehouses.includes(currentWarehouse)) warehouses.push(currentWarehouse);
+      } catch(e){}
+    }
+
+    // 通用 HTML 转义
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ---------- UI 渲染 ----------
+
+    function renderWarehouses() {
+      const render = (containerId) => {
+        const ws = $(containerId);
+        ws.innerHTML = '';
+        warehouses.forEach(wh => {
+          const btn = document.createElement('button');
+          btn.className = 'wh-btn' + (wh === currentWarehouse ? ' active' : '');
+          btn.textContent = wh;
+          btn.onclick = () => { currentWarehouse = wh; renderAll(); };
+          ws.appendChild(btn);
+        });
+      };
+      render('warehouse-selector');
+      render('convert-warehouse-selector');
+    }
+
+    function renderItems() {
+      $('list-title').textContent = currentWarehouse + ' · 已点记录';
+      const filtered = items.filter(it => it.warehouse === currentWarehouse);
+      $('item-count').textContent = filtered.length + ' 条';
+
+      const ul = $('item-list');
+      ul.innerHTML = '';
+      if (filtered.length === 0) {
+        ul.innerHTML = '<li style="justify-content:center; color:#86868b; padding: 20px 0;">暂无记录</li>';
+      } else {
+        filtered.forEach((it) => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <span style="flex:1; word-break:break-all;">${escapeHtml(it.name)}</span>
+            <button class="delete-btn" data-index="${items.indexOf(it)}">✕</button>
+          `;
+          ul.appendChild(li);
+        });
+      }
+    }
+
+    function renderSettings() {
+      // 渲染 CODE
+      const ulIC = $('item-code-list');
+      ulIC.innerHTML = '';
+      const icKeys = Object.keys(itemCodes);
+      if (icKeys.length === 0) {
+        ulIC.innerHTML = '<li style="justify-content:center; color:#86868b;">暂无数据</li>';
+      } else {
+        icKeys.forEach(key => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <span>${escapeHtml(key)} <span style="color:#86868b;">→</span> <b style="color:#007aff;">${escapeHtml(itemCodes[key])}</b></span>
+            <button class="delete-btn" onclick="deleteIC('${escapeHtml(key)}')">✕</button>
+          `;
+          ulIC.appendChild(li);
+        });
+      }
+
+      // 渲染 专属倍率
+      const ulIR = $('item-rate-list');
+      ulIR.innerHTML = '';
+      const irKeys = Object.keys(itemRates);
+      if (irKeys.length === 0) {
+        ulIR.innerHTML = '<li style="justify-content:center; color:#86868b;">暂无数据</li>';
+      } else {
+        irKeys.forEach(key => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <span>${escapeHtml(key)} <span style="color:#86868b;">→</span> <b style="color:#34c759;">倍率 x${itemRates[key]}</b></span>
+            <button class="delete-btn" onclick="deleteIR('${escapeHtml(key)}')">✕</button>
+          `;
+          ulIR.appendChild(li);
+        });
+      }
+    }
+
+    function renderAll() {
+      renderWarehouses();
+      renderItems();
+      renderSettings();
+    }
+
+    window.deleteIC = function(key) { delete itemCodes[key]; save(); renderSettings(); };
+    window.deleteIR = function(key) { delete itemRates[key]; save(); renderSettings(); };
+
+    // ---------- 核心功能：倒序扫描解析 ----------
+    
+    function parseLine(text) {
+      const cleanText = text.replace(/[\u200b-\u200f\u202a-\u202e\ufeff]/g, '').trim();
+      const cnNums = '零一二三四五六七八九十百千万两';
+      const enNums = '0123456789０１２３４５６７８９';
+      
+      let unit = '';
+      let numStr = '';
+      let i = cleanText.length - 1;
+      
+      while (i >= 0) {
+        const char = cleanText[i];
+        if (/[a-zA-Z\u4e00-\u9fa5]/.test(char) && cnNums.indexOf(char) === -1) {
+          unit = char + unit;
+          i--;
+        } else {
+          break;
+        }
+      }
+      
+      while (i >= 0 && /\s/.test(cleanText[i])) { i--; }
+      
+      while (i >= 0) {
+        const char = cleanText[i];
+        if (cnNums.indexOf(char) !== -1 || enNums.indexOf(char) !== -1 || char === '.') {
+          numStr = char + numStr;
+          i--;
+        } else {
+          break;
+        }
+      }
+      
+      const name = cleanText.substring(0, i + 1).trim();
+      
+      if (name && numStr) {
+        const halfNum = numStr.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+        const rawQty = cnToNum(halfNum);
+        return { name, unit, rawQty, original: text };
+      }
+      return null;
+    }
+
+    function executeParse() {
+      const rawText = $('convert-textarea').value;
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
+      const container = $('convert-results');
+      
+      if (lines.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">没有可转换的内容</div>';
+        return;
+      }
+
+      // 构建 4 列表格
+      let tableHTML = `
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th class="col-original">原文</th>
+              <th class="col-code">ITEM CODE</th>
+              <th class="col-qty">QUANTITY</th>
+              <th class="col-rate">专属倍率</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      lines.forEach((line) => {
+        const parsed = parseLine(line);
+        if (!parsed) {
+          tableHTML += `
+            <tr>
+              <td colspan="4" style="color:#ff3b30; padding: 12px;">⚠️ 无法解析：${escapeHtml(line)}</td>
+            </tr>
+          `;
+          return;
+        }
+
+        const { name, unit, rawQty, original } = parsed;
+        const code = itemCodes[name] || '';
+        
+        // 获取该物品的专属倍率 (key: 货名_单位)
+        const rateKey = name + '_' + unit;
+        const savedRate = itemRates[rateKey];
+        const initRate = savedRate !== undefined ? savedRate : 1; 
+        const initQty = parseFloat((rawQty * initRate).toFixed(4));
+
+        tableHTML += `
+          <tr class="data-row" data-name="${escapeHtml(name)}" data-unit="${escapeHtml(unit)}" data-rawqty="${rawQty}">
+            <td class="col-original">${escapeHtml(original)}</td>
+            <td><input type="text" class="inp-code" value="${escapeHtml(code)}" placeholder="输入CODE"></td>
+            <td><input type="number" class="inp-qty" value="${initQty}"></td>
+            <td><input type="number" class="inp-rate" value="${initRate}" step="any"></td>
+          </tr>
+        `;
+      });
+
+      tableHTML += `</tbody></table>`;
+      container.innerHTML = tableHTML;
+    }
+
+    // 监听表格内的输入变化，双向计算并实时保存记忆
+    $('convert-results').addEventListener('input', (e) => {
+      const input = e.target;
+      const tr = input.closest('.data-row');
+      if (!tr) return;
+      
+      const name = tr.dataset.name;
+      const unit = tr.dataset.unit;
+      const rawQty = parseFloat(tr.dataset.rawqty) || 0;
+      if (!name) return;
+
+      const rateKey = name + '_' + unit;
+      const codeInput = tr.querySelector('.inp-code');
+      const rateInput = tr.querySelector('.inp-rate');
+      const qtyInput = tr.querySelector('.inp-qty');
+
+      // 1. 修改了 CODE
+      if (input.classList.contains('inp-code')) {
+        const codeVal = codeInput.value.trim();
+        if (codeVal) itemCodes[name] = codeVal;
+        else delete itemCodes[name];
+        save();
+      }
+
+      // 2. 修改了 专属倍率 -> 重算数量
+      if (input.classList.contains('inp-rate')) {
+        const newRate = parseFloat(rateInput.value);
+        if (!isNaN(newRate)) {
+          if (newRate === 1) {
+            delete itemRates[rateKey]; // 1 是默认值，不用保存
+          } else {
+            itemRates[rateKey] = newRate;
+          }
+          save();
+          
+          // 自动计算并更新 QUANTITY
+          qtyInput.value = parseFloat((rawQty * newRate).toFixed(4));
+        }
+      }
+
+      // 3. 修改了 QUANTITY -> 反推倍率（你的核心需求）
+      if (input.classList.contains('inp-qty')) {
+        const newQty = parseFloat(qtyInput.value);
+        if (!isNaN(newQty) && rawQty > 0) {
+          // 计算倍率 = 输入的总数 / 解析出的原始数量
+          const calculatedRate = parseFloat((newQty / rawQty).toFixed(4));
+          
+          // 更新倍率输入框
+          rateInput.value = calculatedRate;
+          
+          // 保存记忆
+          if (calculatedRate === 1) {
+            delete itemRates[rateKey];
+          } else {
+            itemRates[rateKey] = calculatedRate;
+          }
+          save();
+        }
+      }
     });
 
-    renameWhBtn.addEventListener('click', () => {
+    // ---------- 事件绑定 ----------
+
+    const transcript = $('transcript');
+    const addBtn = $('add-btn');
+    
+    function addRecord() {
+      const text = transcript.value.trim();
+      if (!text) return;
+      items.push({ name: text, warehouse: currentWarehouse });
+      transcript.value = '';
+      save();
+      renderItems();
+    }
+
+    addBtn.addEventListener('mousedown', e => e.preventDefault());
+    addBtn.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
+    addBtn.addEventListener('click', () => { addRecord(); transcript.focus(); });
+    transcript.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addRecord(); }
+    });
+
+    $('go-convert-btn').addEventListener('click', () => {
+      const filtered = items.filter(it => it.warehouse === currentWarehouse);
+      if (filtered.length === 0) {
+        showToast('当前仓库没有记录');
+        return;
+      }
+      $('convert-textarea').value = filtered.map(it => it.name).join('\n');
+      document.querySelector('.nav-item[data-target="page-convert"]').click();
+      setTimeout(executeParse, 100);
+    });
+
+    $('execute-convert-btn').addEventListener('click', () => {
+      executeParse();
+      showToast('解析完成');
+    });
+
+    $('item-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('.delete-btn');
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.index, 10);
+      if (!isNaN(idx)) {
+        items.splice(idx, 1);
+        save();
+        renderItems();
+      }
+    });
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        $(e.currentTarget.dataset.target).classList.add('active');
+        document.activeElement.blur();
+        if (e.currentTarget.dataset.target === 'page-settings') renderSettings();
+      });
+    });
+
+    $('add-item-btn').addEventListener('click', () => {
+      const name = $('new-item-name').value.trim();
+      const code = $('new-item-code').value.trim().toUpperCase();
+      if (name && code) {
+        itemCodes[name] = code;
+        $('new-item-name').value = '';
+        $('new-item-code').value = '';
+        save(); renderSettings();
+      }
+    });
+
+    $('rename-wh-btn').addEventListener('click', () => {
       const oldName = currentWarehouse;
       const newName = prompt(`请输入新的仓名（当前：${oldName}）：`, oldName);
       if (newName && newName.trim() !== '' && newName !== oldName) {
@@ -217,55 +568,13 @@
         if (idx !== -1) warehouses[idx] = trimmedName;
         items.forEach(it => { if (it.warehouse === oldName) it.warehouse = trimmedName; });
         currentWarehouse = trimmedName;
-        render();
-        showToast('仓名修改成功');
+        save(); renderAll();
       }
     });
 
-    function parseAndAdd(text) {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-
-      // 【修改点】不再使用正则拆分，直接把整段文字作为一个记录存下来
-      items.push({ 
-        name: trimmed, 
-        qty: '', // 留空
-        warehouse: currentWarehouse 
-      });
-      
-      transcript.value = '';
-      render();
-    }
-
-    // 阻止按钮在触摸时夺走输入框的焦点，防止键盘收起
-    addBtn.addEventListener('mousedown', e => e.preventDefault());
-    addBtn.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
-
-    addBtn.addEventListener('click', () => {
-      parseAndAdd(transcript.value);
-      transcript.focus(); // 确保焦点还在
-    });
-    
-    transcript.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); // 阻止换行
-        parseAndAdd(transcript.value);
-      }
-    });
-
-    itemList.addEventListener('click', (e) => {
-      const btn = e.target.closest('.delete-btn');
-      if (!btn) return;
-      const idx = parseInt(btn.dataset.index, 10);
-      if (!isNaN(idx)) {
-        items.splice(idx, 1);
-        render();
-      }
-    });
-
+    // 启动
     load();
-    render();
-
+    renderAll();
   })();
   </script>
 </body>
