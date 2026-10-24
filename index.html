@@ -37,7 +37,7 @@
     }
     .input-tip { font-size: 13px; color: #86868b; margin-bottom: 8px; }
     #transcript {
-      width: 100%; min-height: 60px; padding: 12px; border: 1.5px solid #d1d1d6;
+      width: 100%; min-height: 80px; padding: 12px; border: 1.5px solid #d1d1d6;
       border-radius: 12px; font-size: 18px; line-height: 1.5; resize: none;
       font-family: inherit; background: #fafafa; margin-bottom: 12px;
     }
@@ -97,9 +97,8 @@
   <div class="warehouse-selector" id="warehouse-selector"></div>
 
   <div class="input-section">
-    <div class="input-tip">点击输入框，使用键盘上的 🎤 听写（格式：商品名 数量）</div>
-    <!-- 关键：加上 enterkeyhint="done" 方便手机键盘操作 -->
-    <textarea id="transcript" placeholder="例如：苹果 10" enterkeyhint="done"></textarea>
+    <div class="input-tip">💡 直接用键盘听写，说完按键盘右下角的“发送”即可连续录入。</div>
+    <textarea id="transcript" placeholder="例如：苹果 10" enterkeyhint="send"></textarea>
     <div class="btn-row">
       <button class="btn btn-primary" id="add-btn">添加</button>
     </div>
@@ -120,11 +119,10 @@
   (function() {
     'use strict';
 
-    // ---------- 状态与存储 ----------
     const STORAGE_KEY = 'dianhuo_data_v2';
-    let warehouses = ['A仓', 'B仓', 'C仓']; // 默认仓名
+    let warehouses = ['A仓', 'B仓', 'C仓'];
     let currentWarehouse = 'A仓';
-    let items = []; // { name, qty, warehouse }
+    let items = []; 
 
     const $ = id => document.getElementById(id);
     const warehouseSelector = $('warehouse-selector');
@@ -155,17 +153,11 @@
         if (data.warehouses && Array.isArray(data.warehouses)) warehouses = data.warehouses;
         if (data.warehouse) currentWarehouse = data.warehouse;
         if (Array.isArray(data.items)) items = data.items;
-        
-        // 兼容旧数据：如果当前仓不在列表里，加进去
-        if (!warehouses.includes(currentWarehouse)) {
-          warehouses.push(currentWarehouse);
-        }
+        if (!warehouses.includes(currentWarehouse)) warehouses.push(currentWarehouse);
       } catch (e) {}
     }
 
-    // ---------- 渲染 ----------
     function render() {
-      // 1. 渲染货仓按钮
       warehouseSelector.innerHTML = '';
       warehouses.forEach(wh => {
         const btn = document.createElement('button');
@@ -175,7 +167,6 @@
         warehouseSelector.appendChild(btn);
       });
 
-      // 2. 渲染列表
       listTitle.textContent = currentWarehouse + ' · 已点货物';
       const filtered = items.filter(it => it.warehouse === currentWarehouse);
       itemCount.textContent = filtered.length + ' 项';
@@ -204,7 +195,6 @@
       return d.innerHTML;
     }
 
-    // ---------- Toast ----------
     let toastTimer;
     function showToast(msg) {
       toastEl.textContent = msg;
@@ -213,9 +203,6 @@
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
     }
 
-    // ---------- 交互 ----------
-    
-    // 切换仓库
     warehouseSelector.addEventListener('click', e => {
       const btn = e.target.closest('.wh-btn');
       if (!btn) return;
@@ -223,34 +210,24 @@
       render();
     });
 
-    // 修改仓名功能
     renameWhBtn.addEventListener('click', () => {
       const oldName = currentWarehouse;
       const newName = prompt(`请输入新的仓名（当前：${oldName}）：`, oldName);
-      
       if (newName && newName.trim() !== '' && newName !== oldName) {
         const trimmedName = newName.trim();
-        // 更新仓名列表
         const idx = warehouses.indexOf(oldName);
         if (idx !== -1) warehouses[idx] = trimmedName;
-        
-        // 更新现有货物的归属仓
-        items.forEach(it => {
-          if (it.warehouse === oldName) it.warehouse = trimmedName;
-        });
-        
+        items.forEach(it => { if (it.warehouse === oldName) it.warehouse = trimmedName; });
         currentWarehouse = trimmedName;
         render();
         showToast('仓名修改成功');
       }
     });
 
-    // 添加物品
     function parseAndAdd(text) {
       const trimmed = text.trim();
       if (!trimmed) return;
 
-      // 匹配末尾的数字
       const match = trimmed.match(/^(.+?)\s*(\d+(?:\.\d+)?)\s*(?:个|箱|件|包|瓶|袋)?$/);
       let name, qty;
       if (match) {
@@ -264,29 +241,27 @@
       if (!name) return;
 
       items.push({ name: name, qty: qty, warehouse: currentWarehouse });
-      
-      // 清空输入框
       transcript.value = '';
-      
       render();
-      
-      // 关键点：重新聚焦输入框，防止键盘收起，方便连续听写
-      setTimeout(() => {
-        transcript.focus();
-      }, 50);
     }
 
-    addBtn.addEventListener('click', () => parseAndAdd(transcript.value));
+    // 【关键修复 1】阻止按钮在触摸时夺走输入框的焦点
+    addBtn.addEventListener('mousedown', e => e.preventDefault());
+    addBtn.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
+
+    addBtn.addEventListener('click', () => {
+      parseAndAdd(transcript.value);
+      transcript.focus(); // 确保焦点还在
+    });
     
-    // 允许按回车直接添加
     transcript.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+      if (e.key === 'Enter') {
+        e.preventDefault(); // 阻止换行
         parseAndAdd(transcript.value);
+        // 键盘发送后，焦点天然保留，不需要额外 focus
       }
     });
 
-    // 删除物品
     itemList.addEventListener('click', (e) => {
       const btn = e.target.closest('.delete-btn');
       if (!btn) return;
@@ -297,7 +272,6 @@
       }
     });
 
-    // ---------- 启动 ----------
     load();
     render();
 
