@@ -15,52 +15,40 @@
       margin: 0; padding: 16px; padding-top: max(16px, env(safe-area-inset-top));
       background: #f5f5f7; color: #1d1d1f; min-height: 100vh;
     }
-    h1 { font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+    h1 { font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; justify-content: space-between; }
+    .edit-wh-btn {
+      font-size: 14px; padding: 6px 12px; background: #e5e5ea; border: none;
+      border-radius: 8px; color: #1d1d1f; font-weight: 500; cursor: pointer;
+    }
     .warehouse-selector {
       display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
     }
-    .warehouse-selector button {
-      flex: 1; min-width: 100px; padding: 12px; border: 2px solid #d1d1d6; border-radius: 12px;
+    .warehouse-selector button.wh-btn {
+      flex: 1; min-width: 80px; padding: 12px; border: 2px solid #d1d1d6; border-radius: 12px;
       background: white; font-size: 16px; font-weight: 500; color: #1d1d1f; cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .warehouse-selector button.active {
+    .warehouse-selector button.wh-btn.active {
       border-color: #007aff; background: #007aff; color: white;
     }
-    .voice-section {
-      background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px;
+    .input-section {
+      background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
-    .voice-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
-    .mic-btn {
-      width: 72px; height: 72px; border-radius: 50%; border: none;
-      background: #007aff; color: white; font-size: 32px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s; flex-shrink: 0;
-      box-shadow: 0 4px 14px rgba(0,122,255,0.35);
-    }
-    .mic-btn:active { transform: scale(0.92); }
-    .mic-btn.recording { background: #ff3b30; animation: pulse 1.2s infinite; }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 4px 14px rgba(255,59,48,0.35); }
-      50% { box-shadow: 0 4px 24px rgba(255,59,48,0.65); }
-    }
-    .voice-status { font-size: 14px; color: #86868b; flex: 1; }
-    .voice-status.listening { color: #ff3b30; font-weight: 600; }
+    .input-tip { font-size: 13px; color: #86868b; margin-bottom: 8px; }
     #transcript {
       width: 100%; min-height: 60px; padding: 12px; border: 1.5px solid #d1d1d6;
-      border-radius: 12px; font-size: 16px; line-height: 1.5; resize: vertical;
-      font-family: inherit; background: #fafafa;
+      border-radius: 12px; font-size: 18px; line-height: 1.5; resize: none;
+      font-family: inherit; background: #fafafa; margin-bottom: 12px;
     }
     #transcript:focus { outline: none; border-color: #007aff; background: white; }
-    .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+    .btn-row { display: flex; gap: 10px; }
     .btn {
       flex: 1; padding: 14px; border: none; border-radius: 12px; font-size: 16px;
       font-weight: 600; cursor: pointer; transition: opacity 0.15s;
     }
     .btn:active { opacity: 0.7; }
     .btn-primary { background: #007aff; color: white; }
-    .btn-secondary { background: #e5e5ea; color: #1d1d1f; }
     .list-section {
       background: white; border-radius: 16px; overflow: hidden;
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
@@ -77,7 +65,7 @@
       display: flex; justify-content: space-between; align-items: center; font-size: 16px;
     }
     #item-list li:last-child { border-bottom: none; }
-    .item-name { flex: 1; }
+    .item-name { flex: 1; word-break: break-all; }
     .item-qty {
       font-weight: 700; color: #007aff; margin: 0 12px; font-size: 18px; min-width: 40px;
       text-align: right;
@@ -101,35 +89,29 @@
 </head>
 <body>
 
-  <h1>📦 点货</h1>
+  <h1>
+    📦 点货
+    <button class="edit-wh-btn" id="rename-wh-btn">✏️ 改仓名</button>
+  </h1>
 
-  <div class="warehouse-selector" id="warehouse-selector">
-    <button data-wh="A仓" class="active">A仓</button>
-    <button data-wh="B仓">B仓</button>
-    <button data-wh="C仓">C仓</button>
-  </div>
+  <div class="warehouse-selector" id="warehouse-selector"></div>
 
-  <div class="voice-section">
-    <div class="voice-controls">
-      <button class="mic-btn" id="mic-btn" title="点击开始语音输入">🎤</button>
-      <div class="voice-status" id="voice-status">
-        点击麦克风开始说话，或直接使用键盘听写
-      </div>
-    </div>
-    <textarea id="transcript" placeholder="语音内容会出现在这里，也可以直接输入或使用键盘麦克风听写&#10;格式示例：苹果 10、香蕉 5"></textarea>
+  <div class="input-section">
+    <div class="input-tip">点击输入框，使用键盘上的 🎤 听写（格式：商品名 数量）</div>
+    <!-- 关键：加上 enterkeyhint="done" 方便手机键盘操作 -->
+    <textarea id="transcript" placeholder="例如：苹果 10" enterkeyhint="done"></textarea>
     <div class="btn-row">
-      <button class="btn btn-primary" id="add-btn">➕ 添加</button>
-      <button class="btn btn-secondary" id="clear-input-btn">清空输入</button>
+      <button class="btn btn-primary" id="add-btn">添加</button>
     </div>
   </div>
 
   <div class="list-section">
     <div class="list-header">
-      <span id="list-title">A仓 · 已点货物</span>
+      <span id="list-title">已点货物</span>
       <span id="item-count">0 项</span>
     </div>
     <ul id="item-list"></ul>
-    <div class="empty-state" id="empty-state">还没有点货记录<br>说出“商品名 数量”然后添加</div>
+    <div class="empty-state" id="empty-state">还没有点货记录<br>输入后点击“添加”</div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -138,63 +120,72 @@
   (function() {
     'use strict';
 
-    // ---------- 状态 ----------
-    const STORAGE_KEY = 'dianhuo_data_v1';
+    // ---------- 状态与存储 ----------
+    const STORAGE_KEY = 'dianhuo_data_v2';
+    let warehouses = ['A仓', 'B仓', 'C仓']; // 默认仓名
     let currentWarehouse = 'A仓';
     let items = []; // { name, qty, warehouse }
 
-    // ---------- DOM ----------
     const $ = id => document.getElementById(id);
     const warehouseSelector = $('warehouse-selector');
-    const micBtn = $('mic-btn');
-    const voiceStatus = $('voice-status');
     const transcript = $('transcript');
     const addBtn = $('add-btn');
-    const clearInputBtn = $('clear-input-btn');
     const itemList = $('item-list');
     const emptyState = $('empty-state');
     const listTitle = $('list-title');
     const itemCount = $('item-count');
     const toastEl = $('toast');
+    const renameWhBtn = $('rename-wh-btn');
 
-    // ---------- 持久化 ----------
     function save() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouse: currentWarehouse, items }));
-      } catch (e) { /* 忽略隐私模式下的错误 */ }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+          warehouses: warehouses, 
+          warehouse: currentWarehouse, 
+          items: items 
+        }));
+      } catch (e) {}
     }
 
     function load() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('dianhuo_data_v1');
         if (!raw) return;
         const data = JSON.parse(raw);
+        if (data.warehouses && Array.isArray(data.warehouses)) warehouses = data.warehouses;
         if (data.warehouse) currentWarehouse = data.warehouse;
         if (Array.isArray(data.items)) items = data.items;
-      } catch (e) { /* 忽略 */ }
+        
+        // 兼容旧数据：如果当前仓不在列表里，加进去
+        if (!warehouses.includes(currentWarehouse)) {
+          warehouses.push(currentWarehouse);
+        }
+      } catch (e) {}
     }
 
     // ---------- 渲染 ----------
     function render() {
-      // 货仓按钮状态
-      warehouseSelector.querySelectorAll('button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.wh === currentWarehouse);
+      // 1. 渲染货仓按钮
+      warehouseSelector.innerHTML = '';
+      warehouses.forEach(wh => {
+        const btn = document.createElement('button');
+        btn.className = 'wh-btn' + (wh === currentWarehouse ? ' active' : '');
+        btn.textContent = wh;
+        btn.dataset.wh = wh;
+        warehouseSelector.appendChild(btn);
       });
 
-      // 列表标题
+      // 2. 渲染列表
       listTitle.textContent = currentWarehouse + ' · 已点货物';
-
-      // 当前货仓的项目
       const filtered = items.filter(it => it.warehouse === currentWarehouse);
       itemCount.textContent = filtered.length + ' 项';
 
-      // 列表
       itemList.innerHTML = '';
       if (filtered.length === 0) {
         emptyState.style.display = 'block';
       } else {
         emptyState.style.display = 'none';
-        filtered.forEach((it, idx) => {
+        filtered.forEach((it) => {
           const li = document.createElement('li');
           li.innerHTML = `
             <span class="item-name">${escapeHtml(it.name)}</span>
@@ -204,7 +195,6 @@
           itemList.appendChild(li);
         });
       }
-
       save();
     }
 
@@ -223,128 +213,72 @@
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
     }
 
-    // ---------- 货仓切换 ----------
+    // ---------- 交互 ----------
+    
+    // 切换仓库
     warehouseSelector.addEventListener('click', e => {
-      const btn = e.target.closest('button');
+      const btn = e.target.closest('.wh-btn');
       if (!btn) return;
       currentWarehouse = btn.dataset.wh;
       render();
     });
 
-    // ---------- 语音识别 ----------
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = null;
-    let isRecording = false;
-
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition();
-      recognition.lang = 'zh-CN';
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        isRecording = true;
-        micBtn.classList.add('recording');
-        voiceStatus.textContent = '🎙️ 正在聆听…再次点击停止';
-        voiceStatus.classList.add('listening');
-      };
-
-      recognition.onresult = (event) => {
-        let interim = '', final = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const t = event.results[i][0].transcript;
-          if (event.results[i].isFinal) final += t;
-          else interim += t;
-        }
-        transcript.value = final || interim;
-      };
-
-      recognition.onerror = (event) => {
-        console.warn('语音识别错误:', event.error);
-        if (event.error === 'not-allowed') {
-          voiceStatus.textContent = '❌ 麦克风权限被拒绝，请在 Safari 设置中允许';
-          showToast('请允许麦克风权限');
-        } else if (event.error === 'no-speech') {
-          voiceStatus.textContent = '没有检测到语音，请重试';
-        } else {
-          voiceStatus.textContent = '识别出错，请重试';
-        }
-      };
-
-      recognition.onend = () => {
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        voiceStatus.classList.remove('listening');
-        voiceStatus.textContent = '点击麦克风开始说话，或直接使用键盘听写';
-      };
-    } else {
-      // 不支持 Web Speech API 时的降级
-      micBtn.style.opacity = '0.4';
-      voiceStatus.textContent = '此浏览器不支持语音识别，请使用键盘听写（点击输入框 → 键盘上的 🎤）';
-    }
-
-    micBtn.addEventListener('click', () => {
-      if (!recognition) {
-        showToast('请使用键盘听写：点击输入框，再按键盘上的麦克风');
-        transcript.focus();
-        return;
-      }
-      if (isRecording) {
-        recognition.stop();
-      } else {
-        transcript.value = '';
-        try {
-          recognition.start();
-        } catch (e) {
-          // 防止重复 start
-          recognition.stop();
-          setTimeout(() => recognition.start(), 200);
-        }
+    // 修改仓名功能
+    renameWhBtn.addEventListener('click', () => {
+      const oldName = currentWarehouse;
+      const newName = prompt(`请输入新的仓名（当前：${oldName}）：`, oldName);
+      
+      if (newName && newName.trim() !== '' && newName !== oldName) {
+        const trimmedName = newName.trim();
+        // 更新仓名列表
+        const idx = warehouses.indexOf(oldName);
+        if (idx !== -1) warehouses[idx] = trimmedName;
+        
+        // 更新现有货物的归属仓
+        items.forEach(it => {
+          if (it.warehouse === oldName) it.warehouse = trimmedName;
+        });
+        
+        currentWarehouse = trimmedName;
+        render();
+        showToast('仓名修改成功');
       }
     });
 
-    // ---------- 添加物品 ----------
+    // 添加物品
     function parseAndAdd(text) {
       const trimmed = text.trim();
-      if (!trimmed) {
-        showToast('请先输入或说出内容');
-        return;
-      }
+      if (!trimmed) return;
 
-      // 尝试解析“商品名 数量”，支持中文数字和阿拉伯数字
-      // 匹配末尾的数字（可能带“个”“箱”“件”等单位）
+      // 匹配末尾的数字
       const match = trimmed.match(/^(.+?)\s*(\d+(?:\.\d+)?)\s*(?:个|箱|件|包|瓶|袋)?$/);
       let name, qty;
-
       if (match) {
         name = match[1].trim();
         qty = parseFloat(match[2]);
       } else {
-        // 没有识别到数量，默认数量为 1，整句作为名称
         name = trimmed;
         qty = 1;
       }
 
-      if (!name) {
-        showToast('无法识别商品名称');
-        return;
-      }
+      if (!name) return;
 
-      items.push({
-        name: name,
-        qty: qty,
-        warehouse: currentWarehouse
-      });
-
+      items.push({ name: name, qty: qty, warehouse: currentWarehouse });
+      
+      // 清空输入框
       transcript.value = '';
+      
       render();
-      showToast(`已添加：${name} × ${qty}`);
+      
+      // 关键点：重新聚焦输入框，防止键盘收起，方便连续听写
+      setTimeout(() => {
+        transcript.focus();
+      }, 50);
     }
 
     addBtn.addEventListener('click', () => parseAndAdd(transcript.value));
-
-    // 回车快速添加（桌面端方便）
+    
+    // 允许按回车直接添加
     transcript.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -352,12 +286,7 @@
       }
     });
 
-    clearInputBtn.addEventListener('click', () => {
-      transcript.value = '';
-      transcript.focus();
-    });
-
-    // ---------- 删除 ----------
+    // 删除物品
     itemList.addEventListener('click', (e) => {
       const btn = e.target.closest('.delete-btn');
       if (!btn) return;
@@ -372,10 +301,6 @@
     load();
     render();
 
-    // 如果页面是通过“添加到主屏幕”打开的，隐藏地址栏影响
-    if (window.navigator.standalone) {
-      document.body.style.paddingTop = 'max(12px, env(safe-area-inset-top))';
-    }
   })();
   </script>
 </body>
