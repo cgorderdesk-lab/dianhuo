@@ -679,4 +679,51 @@
     $('import-btn').addEventListener('click', () => {
       const backupStr = $('backup-data').value.trim();
       if (!backupStr) {
-        showToast('
+        showToast('请先粘贴备份代码');
+        return;
+      }
+      try {
+        const jsonStr = decodeURIComponent(atob(backupStr));
+        const d = JSON.parse(jsonStr);
+        
+        if (!d.items || !d.itemCodes) throw new Error('无效格式');
+
+        if (confirm('导入将覆盖当前所有数据，确定继续吗？')) {
+          if (d.warehouses) warehouses = d.warehouses;
+          if (d.currentWarehouse) currentWarehouse = d.currentWarehouse;
+          if (d.items) items = d.items;
+          if (d.itemCodes) itemCodes = d.itemCodes;
+          if (d.itemRates) itemRates = d.itemRates;
+          
+          if (!warehouses.includes(currentWarehouse) && warehouses.length > 0) {
+            currentWarehouse = warehouses[0];
+          }
+
+          save();
+          renderAll();
+          $('backup-data').value = '';
+          showToast('✅ 导入成功！数据已恢复');
+        }
+      } catch (e) {
+        showToast('❌ 无效的备份代码，请检查是否复制完整');
+      }
+    });
+
+    $('clear-items-btn').addEventListener('click', () => {
+      if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
+        items = []; 
+        $('convert-textarea').value = '';
+        $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
+        save();
+        renderItems();
+        showToast('🗑️ 点货和转换数据已清空');
+      }
+    });
+
+    // 启动
+    load();
+    renderAll();
+  })();
+  </script>
+</body>
+</html>
