@@ -93,7 +93,7 @@
     .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
     .toast.show { opacity: 1; }
 
-    /* ======= 新增：彈出層與選單樣式 ======= */
+    /* ======= 彈出層與選單樣式 ======= */
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 300; backdrop-filter: blur(2px); }
     .modal-overlay.active { display: flex; }
     .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; }
@@ -102,6 +102,17 @@
     .menu-btn:active { background: #e5e5ea; }
     .menu-btn.danger { color: var(--danger); background: rgba(255,59,48,0.1); }
     .menu-btn.cancel { text-align: center; background: transparent; color: #86868b; margin-top: 5px; padding-left: 0; }
+
+    /* ======= 網頁 Excel 預覽表格樣式 ======= */
+    .preview-scroll { max-height: 50vh; overflow: auto; border: 1px solid #e5e5ea; border-radius: 8px; margin-bottom: 16px; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    .preview-table th, .preview-table td { padding: 8px 10px; border: 1px solid #e5e5ea; text-align: center; }
+    .preview-table th { background: #f5f5f7; font-weight: bold; position: sticky; top: 0; z-index: 1; }
+    .preview-table td:first-child { text-align: left; font-weight: bold; color: var(--primary); }
+    .preview-table td:last-child { font-weight: bold; color: var(--success); }
+    
+    /* 新品紅色樣式 */
+    .text-new-item { color: #ff3b30 !important; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -132,12 +143,20 @@
 
   <!-- ================= 页面 2：转换页 ================= -->
   <div id="page-convert" class="page">
-    <h1>🔄 转换核对</h1>
+    <h1>
+      🔄 转换核对
+      <button id="export-csv-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold;">📥 导出 Excel</button>
+    </h1>
     <div class="warehouse-selector" id="convert-warehouse-selector"></div>
     
     <div class="card">
-      <div style="font-size: 14px; color: #555; margin-bottom: 8px; font-weight: bold;">📝 点货内容（可修改）</div>
-      <textarea id="convert-textarea" rows="4" placeholder="第一页的内容会显示在这里，每行一条"></textarea>
+      <!-- 拉取按鈕 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <div style="font-size: 14px; color: #555; font-weight: bold;">📝 点货内容（可修改）</div>
+        <button id="pull-data-btn" style="font-size:12px; padding:6px 12px; border-radius:8px; border:none; background:#007aff; color:white; font-weight:bold;">📥 拉取数据</button>
+      </div>
+      
+      <textarea id="convert-textarea" rows="4" placeholder="点击「拉取数据」或从点货页过来..."></textarea>
       <button class="btn btn-primary btn-block" id="execute-convert-btn">🔄 执行转换</button>
     </div>
 
@@ -208,7 +227,7 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- ======= 新增：倉庫管理選單彈出層 ======= -->
+  <!-- ======= 倉庫管理選單彈出層 ======= -->
   <div id="wh-modal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-title">🏢 仓库管理</div>
@@ -219,7 +238,7 @@
     </div>
   </div>
 
-  <!-- ======= 新增：通用輸入彈出層 (取代原生 prompt) ======= -->
+  <!-- ======= 通用輸入彈出層 ======= -->
   <div id="input-modal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-title" id="input-title">提示</div>
@@ -231,16 +250,362 @@
     </div>
   </div>
 
+  <!-- ======= Excel 預覽彈出層 ======= -->
+  <div id="csv-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 90%; width: 500px; text-align: left; padding: 16px;">
+      <div class="modal-title" style="text-align: center;">📊 数据预览 (A-Z)</div>
+      
+      <div class="preview-scroll">
+        <table class="preview-table" id="preview-table">
+          <!-- 動態生成 -->
+        </table>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-success" id="confirm-download-btn" style="flex: 1;">📥 下载 Excel</button>
+        <button class="btn" id="cancel-download-btn" style="flex: 1; background: #e5e5ea; color: #1d1d1f;">取消</button>
+      </div>
+    </div>
+  </div>
+
   <script>
   (function() {
     'use strict';
 
-    const STORAGE_KEY = 'dianhuo_data_v7'; 
+    const RAW_ITEMS = `A&W-FOAPJ-btl
+A&W-FOGFJ-btl
+A&W-FOORJ-btl
+A&W-FOPAJ-btl
+A&W-FOTMJ-btl
+A&W-OSCCJ-btl
+A&W-RLMJC-btl
+AE-kg
+AFFCR-pkt
+AGL-kg
+ALIME-pc
+ALS-pkt
+APG(CH)-pc
+APG-pc
+API-pc
+APR-pc
+ASP-kg
+AU-BBR-bdl
+AU-CP-kg
+AU-KP-kg
+AU-TMCOV-kg
+AV-pc
+BA-kg
+BAMBSH-kg
+BBC-pc
+BBEPW-kg
+BBG-kg
+BB-pkt
+BBR200g-pkt
+BBR-CH-kg
+BBS-kg
+BBSPH-kg
+BBSRS-kg
+BC(Fire)-kg
+BC-pc
+BCSM-kg
+BE-kg
+BER-kg
+BF-kg
+BFP-kg
+BG-kg
+BK-kg
+BL-kg
+BMST-kg
+BMV-kg
+BNA-kg
+BPK-kg
+B-pkt
+BRC-US-kg
+BR-kg
+BRP-kg
+BRS-kg
+BR-US-kg
+BSH-pkt
+BS-kg
+BSL-kg
+BSS-kg
+BY-kg
+CA-kg
+CBB-kg
+CBBPUR-kg
+CCB-kg
+CCBT-kg
+CCS-kg
+CER-kg
+CFC-kg
+CF-kg
+C-kg
+CLC-kg
+CLE-kg
+CL-kg
+CM-kg
+CNMUS-kg
+CNMUS-pkt
+CNVP-pkt
+COPGR-pkt
+CORG-kg
+CORN-pc
+CORNUP-pc
+CP-kg
+CRABRY340g-pkt
+CRD-kg
+CR-kg
+CS-kg
+CSM-kg
+CST-kg
+CUS-kg
+CV-kg
+CWCH-pc
+CW-kg
+CY(J)-cs
+DC-kg
+DCS-kg
+DE-pc
+DF-pc
+DILL-kg
+DPNA-kg
+E(HB)-pcs
+E(JP)-pkt
+E(Malaysia)-pc
+E(U.S.A)L-pc
+E(U.S.A)S-pc
+ECGPJ2L(AUS)-btl
+ECGUJ2L(AUS)-btl
+ECLIMJ2L(AUS)-btl
+ECLMJ2L(AUS)-btl
+ECORGJ2L(AUS)-btl
+EDFLOW-pkt
+EDFLW-CHRY-pkt
+EDFLW-HYDGRE(25pcs)-pkt
+EDFLW-HYDPIN(25pcs)-pkt
+EDFLW-HYDPU(25pcs)-pkt
+EDFLW-pkt
+EM-pkt
+E-pc
+EP-kg
+FBA-kg
+FB-case
+FBC-pkt
+FC-pkt
+FERNLV-pkt
+F-kg
+FM946ml-pc
+FMD-kg
+FMV-pkt
+FNL-kg
+FSTCHU(20pc)-bag
+GAS-kg
+GC-kg
+GCS-kg
+GI-kg
+GLG-kg
+GLRS-kg
+GM-kg
+G-pc
+GPD-kg
+GP-kg
+GPS-kg
+GRR-kg
+GVB-pkt
+HBC-pkt
+HBP-kg
+HDM-kg
+HM-kg
+H-pkt
+HR-kg
+IL-kg
+JALPEP-kg
+JO-kg
+JPGCWOS-kg
+JPG-kg
+JP-kg
+KALE-L-kg
+KC-kg
+KF-pc
+K-kg
+LB-kg
+LG-kg
+LIME-pc
+LITGEM-pkt
+LK-kg
+LM-pc
+LRHC-kg
+LRH-kg
+LR-kg
+LRS-kg
+LTR-kg
+LUS-kg
+MB-kg
+MCL-kg
+MELG-kg
+MGGB(B)-pkt
+MGGB(S)-pkt
+MGNAR-pc
+MG-pc
+MGPS-pkt
+MGY-kg
+MHV-kg
+MINPKN-pc
+MIXP-pkt
+M-kg
+MLC-pkt
+MM-kg
+MML-kg
+MMLP-kg
+MN-pc
+M-pkt
+MPL-kg
+MPRT-kg
+MPRT-pkt
+MSW-pkt
+MUCOM-pkt
+MUSMA-pkt
+MUSSEA-pkt
+MW-kg
+NANTZ-pkt
+OG-kg
+OK-kg
+OL-kg
+OM-kg
+OMS-kg
+ON-kg
+ONP-kg
+ORG-pc
+ORGV-pkt
+OR-kg
+ORP-kg
+OSP-kg
+OSPU-kg
+OYM-kg
+PA-pc
+PC-kg
+PCW-kg
+PEA-pkt
+PF-kg
+PG-kg
+PGOL-kg
+PI-kg
+P-kg
+PKN-kg
+PKP-kg
+PLB-kg
+PLRS-kg
+PM-pc
+PN-kg
+POL-kg
+PON-kg
+PPAG-kg
+PPA-kg
+PP-kg
+PR-kg
+PRLB-kg
+PR-pc
+PRS-kg
+PSM3-kg
+PS-pkt
+PSPO-kg
+PTE-pc
+PTOL-kg
+PUS-kg
+PUSP-kg
+PY-kg
+PYT-pc
+QE-pc
+RC-pkt
+RCS-kg
+RCSNS-kg
+RCY-kg
+RLC-kg
+RL-kg
+RM-kg
+RMTM-kg
+RR-kg
+RSPO-kg
+RSP-pkt
+SAC(CH)-kg
+SAC-kg
+SBC-pkt
+SCP-kg
+SE-pc
+SGG-kg
+SG-kg
+SGR-kg
+SHBNA-kg
+SH-kg
+SHP-kg
+SK-kg
+SL-pc
+SM-kg
+SPH-kg
+SPO-kg
+SPOP-kg
+SPP-kg
+SRS-pkt
+SSF-kg
+ST-454gm-pkt
+ST-pkt
+SUG&CIN(3kg)-bag
+SWE-kg
+TASPC(T)-pkt
+TASP-pkt
+TBSL-kg
+TE-kg
+TE-pc
+TG-kg
+TH-kg
+TMCI-pkt
+TMC-kg
+TMCMX-pkt
+TMCNS-kg
+TMCOV(AUS)-pkt
+TMCOV(HL)300g-pkt
+TMCY-pkt
+TM-kg
+TMM-kg
+TR-kg
+TUS-kg
+TW-kg
+TWP-kg
+TYG-kg
+WASP-kg
+WM-kg
+WMR-kg
+WWC-pkt
+YAM-kg
+YC-cs
+ZG-kg
+ZY-kg
+PPAGP-kg
+SKP-kg
+WCP-kg
+FFHB-kg
+BCDY-pc
+FF(TH)5lb-pkt
+CJ-kg
+PGD1cm-kg
+PRD1cm-kg
+PYD1CM-kg
+PGD2.5cm-kg
+PRD2.5cm-kg
+PYD2.5cm-kg
+TMD1cm-kg`;
+
+    const ALL_ITEMS = [...new Set(RAW_ITEMS.split('\n').map(s => s.trim()).filter(s => s))];
+    const ORIGINAL_ITEMS_SET = new Set(ALL_ITEMS.map(i => i.toUpperCase()));
+
+    const STORAGE_KEY = 'dianhuo_data_v8'; 
     let warehouses = ['A仓', 'B仓', 'C仓'];
     let currentWarehouse = 'A仓';
     let items = []; 
     let itemCodes = {}; 
     let itemRates = {}; 
+    let convertState = {}; 
+    let currentExcelData = []; 
 
     const $ = id => document.getElementById(id);
     const toastEl = $('toast');
@@ -293,7 +658,7 @@
 
     function save() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouses, currentWarehouse, items, itemCodes, itemRates }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouses, currentWarehouse, items, itemCodes, itemRates, convertState }));
       } catch(e){
         showToast('存储空间不足，请去设置清理数据');
       }
@@ -308,6 +673,7 @@
         if (d.items) items = d.items;
         if (d.itemCodes) itemCodes = d.itemCodes;
         if (d.itemRates) itemRates = d.itemRates;
+        if (d.convertState) convertState = d.convertState;
         
         if (!warehouses.includes(currentWarehouse)) {
           currentWarehouse = warehouses[0];
@@ -321,6 +687,24 @@
       return d.innerHTML;
     }
 
+    function updateConvertTextareaFromItems(isManualPull = false) {
+      const filtered = items.filter(it => it.warehouse === currentWarehouse);
+      const text = filtered.map(it => it.name).join('\n');
+      
+      $('convert-textarea').value = text;
+      convertState[currentWarehouse] = text;
+      save();
+
+      if (isManualPull) {
+        if (text.trim()) {
+          executeParse();
+        } else {
+          $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库没有点货记录</div>';
+        }
+        showToast(filtered.length > 0 ? `✅ 已拉取 ${filtered.length} 条记录` : '当前仓库没有记录，已清空');
+      }
+    }
+
     function renderWarehouses() {
       const render = (containerId) => {
         const ws = $(containerId);
@@ -329,7 +713,26 @@
           const btn = document.createElement('button');
           btn.className = 'wh-btn' + (wh === currentWarehouse ? ' active' : '');
           btn.textContent = wh;
-          btn.onclick = () => { currentWarehouse = wh; renderAll(); };
+          btn.onclick = () => { 
+            if (currentWarehouse === wh) return; 
+            currentWarehouse = wh; 
+            renderAll(); 
+            
+            if ($('page-convert').classList.contains('active')) {
+              const cachedText = convertState[currentWarehouse];
+              if (cachedText !== undefined) {
+                $('convert-textarea').value = cachedText;
+                if (cachedText.trim()) {
+                  executeParse();
+                } else {
+                  $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
+                }
+              } else {
+                $('convert-textarea').value = '';
+                $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
+              }
+            }
+          };
           ws.appendChild(btn);
         });
       };
@@ -498,6 +901,11 @@
       container.innerHTML = tableHTML;
     }
 
+    $('convert-textarea').addEventListener('input', (e) => {
+      convertState[currentWarehouse] = e.target.value;
+      save();
+    });
+
     $('convert-results').addEventListener('input', (e) => {
       const input = e.target;
       const tr = input.closest('.data-row');
@@ -562,19 +970,190 @@
     });
 
     $('go-convert-btn').addEventListener('click', () => {
-      const filtered = items.filter(it => it.warehouse === currentWarehouse);
-      if (filtered.length === 0) {
-        showToast('当前仓库没有记录');
-        return;
-      }
-      $('convert-textarea').value = filtered.map(it => it.name).join('\n');
+      updateConvertTextareaFromItems(false);
       document.querySelector('.nav-item[data-target="page-convert"]').click();
-      setTimeout(executeParse, 100);
+    });
+
+    $('pull-data-btn').addEventListener('click', () => {
+      updateConvertTextareaFromItems(true);
     });
 
     $('execute-convert-btn').addEventListener('click', () => {
       executeParse();
       showToast('解析完成');
+    });
+
+    // ================= 匯出 Excel (包含所有 ITEM，新品置底標紅) =================
+    $('export-csv-btn').addEventListener('click', () => {
+      let pointData = {};
+      
+      items.forEach(it => {
+        const parsed = parseLine(it.name);
+        if (!parsed) return;
+        
+        const { name, unit, rawQty } = parsed;
+        const code = itemCodes[name] || name; 
+        const rate = itemRates[name + '_' + unit] !== undefined ? itemRates[name + '_' + unit] : 1;
+        const qty = rawQty * rate;
+        const wh = it.warehouse;
+        
+        const key = code.trim().toUpperCase();
+        if (!pointData[key]) pointData[key] = { originalCode: code.trim(), warehouses: {} };
+        if (!pointData[key].warehouses[wh]) pointData[key].warehouses[wh] = 0;
+        pointData[key].warehouses[wh] += qty;
+      });
+
+      // 區分原有清單和全新 Item
+      let oldCodes = [];
+      let newCodes = [];
+
+      // 原本的 Item 清單 (A-Z 排序)
+      ALL_ITEMS.forEach(item => {
+        const key = item.toUpperCase();
+        oldCodes.push(key);
+      });
+      oldCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+      // 找出新出現的 Item
+      Object.keys(pointData).forEach(key => {
+        if (!ORIGINAL_ITEMS_SET.has(key)) {
+          newCodes.push(key);
+        }
+      });
+      newCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+      // 合併 (舊的在前，新的在後)
+      const finalCodes = oldCodes.concat(newCodes);
+      
+      // 建立快速查詢 Map
+      let allItemMap = new Map();
+      ALL_ITEMS.forEach(item => allItemMap.set(item.toUpperCase(), item));
+      Object.keys(pointData).forEach(key => {
+        if (!allItemMap.has(key)) allItemMap.set(key, pointData[key].originalCode);
+      });
+
+      if (finalCodes.length === 0) {
+        showToast('⚠️ 没有可导出的数据');
+        return;
+      }
+
+      // 構建預覽表格 HTML
+      let previewHTML = `<thead><tr><th>Item</th>`;
+      warehouses.forEach(w => previewHTML += `<th>${escapeHtml(w)}</th>`);
+      previewHTML += `<th>Total</th></tr></thead><tbody>`;
+
+      currentExcelData = [];
+
+      finalCodes.forEach(key => {
+        const isNew = !ORIGINAL_ITEMS_SET.has(key);
+        const displayCode = allItemMap.get(key);
+        const whData = pointData[key] ? pointData[key].warehouses : {};
+        
+        const styleStr = isNew ? 'style="color:#ff3b30; font-weight:bold;"' : '';
+        
+        let rowHTML = `<tr><td ${styleStr}>${escapeHtml(displayCode)}</td>`;
+        let total = 0;
+        let rowData = { code: displayCode, warehouses: {}, total: 0, isNew: isNew };
+        
+        warehouses.forEach(wh => {
+          const q = whData[wh] || 0;
+          rowHTML += `<td ${styleStr}>${q > 0 ? q : ''}</td>`;
+          rowData.warehouses[wh] = q > 0 ? q : 0;
+          total += q;
+        });
+        
+        rowHTML += `<td ${styleStr}>${total > 0 ? total : ''}</td></tr>`;
+        rowData.total = total > 0 ? total : 0;
+        
+        previewHTML += rowHTML;
+        currentExcelData.push(rowData);
+      });
+
+      previewHTML += `</tbody>`;
+      $('preview-table').innerHTML = previewHTML;
+      
+      // 顯示預覽視窗
+      $('csv-modal').classList.add('active');
+    });
+
+    // 確認下載 Excel
+    $('confirm-download-btn').addEventListener('click', () => {
+      let excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:x="urn:schemas-microsoft-com:office:excel"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>点货统计</x:Name>
+                  <x:WorksheetOptions>
+                    <x:DisplayGridlines/>
+                    <x:DoNotDisplayGridlines>False</x:DoNotDisplayGridlines>
+                  </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <style>
+            table { border-collapse: collapse; mso-displayed-decimal-separator:"\\."; mso-displayed-thousand-separator:"\\,"; }
+            th, td { border: 0.5pt solid #cccccc; padding: 4px 8px; font-family: Arial, sans-serif; font-size: 11pt; white-space: nowrap; }
+            th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+            .col-item { text-align: left; min-width: 120px; font-weight: bold; }
+            .col-num { text-align: right; min-width: 60px; mso-number-format:"General"; }
+            .col-total { text-align: right; min-width: 60px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th class="col-item">Item</th>
+      `;
+      
+      warehouses.forEach(w => excelContent += `<th class="col-num">${escapeHtml(w)}</th>`);
+      excelContent += `<th class="col-total">Total</th></tr></thead><tbody>`;
+
+      currentExcelData.forEach(row => {
+        // 根據是否為新品設定顏色
+        const colorStyle = row.isNew ? 'color: red;' : '';
+        const fontStyle = row.isNew ? 'font-weight: bold;' : '';
+
+        excelContent += `<tr><td class="col-item" style="${colorStyle} ${fontStyle}">${escapeHtml(row.code)}</td>`;
+        warehouses.forEach(wh => {
+          const q = row.warehouses[wh] || '';
+          excelContent += `<td class="col-num" style="${colorStyle}">${q > 0 ? q : ''}</td>`;
+        });
+        excelContent += `<td class="col-total" style="${colorStyle}">${row.total > 0 ? row.total : ''}</td></tr>`;
+      });
+
+      excelContent += `</tbody></table></body></html>`;
+
+      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      const now = new Date();
+      const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+      
+      link.href = url;
+      link.download = `点货统计_${dateStr}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      $('csv-modal').classList.remove('active');
+      showToast('✅ Excel 下载成功');
+    });
+
+    // 取消下載
+    $('cancel-download-btn').addEventListener('click', () => {
+      $('csv-modal').classList.remove('active');
     });
 
     $('item-list').addEventListener('click', (e) => {
@@ -593,9 +1172,26 @@
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         e.currentTarget.classList.add('active');
-        $(e.currentTarget.dataset.target).classList.add('active');
+        const target = e.currentTarget.dataset.target;
+        $(target).classList.add('active');
         document.activeElement.blur();
-        if (e.currentTarget.dataset.target === 'page-settings') renderSettings();
+        
+        if (target === 'page-convert') {
+          const cachedText = convertState[currentWarehouse];
+          if (cachedText !== undefined) {
+            $('convert-textarea').value = cachedText;
+            if (cachedText.trim()) {
+              executeParse();
+            } else {
+              $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
+            }
+          } else {
+            $('convert-textarea').value = '';
+            $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
+          }
+        } else if (target === 'page-settings') {
+          renderSettings();
+        }
       });
     });
 
@@ -617,7 +1213,6 @@
 
     $('menu-cancel').onclick = () => $('wh-modal').classList.remove('active');
 
-    // 1. 修改倉名
     $('menu-rename').onclick = () => {
       $('wh-modal').classList.remove('active');
       showInputModal('修改当前仓库名称', currentWarehouse, (newName) => {
@@ -626,16 +1221,22 @@
           showToast('该仓库名称已存在');
           return;
         }
+        const oldName = currentWarehouse;
         const idx = warehouses.indexOf(currentWarehouse);
         if (idx !== -1) warehouses[idx] = newName;
-        items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = newName; });
+        items.forEach(it => { if (it.warehouse === oldName) it.warehouse = newName; });
+        
+        if (convertState[oldName] !== undefined) {
+          convertState[newName] = convertState[oldName];
+          delete convertState[oldName];
+        }
+        
         currentWarehouse = newName;
         save(); renderAll();
         showToast('✅ 仓库名称已修改');
       });
     };
 
-    // 2. 新增倉庫
     $('menu-add').onclick = () => {
       $('wh-modal').classList.remove('active');
       showInputModal('新增仓库', '', (newName) => {
@@ -651,7 +1252,6 @@
       });
     };
 
-    // 3. 移除倉庫
     $('menu-remove').onclick = () => {
       $('wh-modal').classList.remove('active');
       if (warehouses.length <= 1) {
@@ -664,8 +1264,11 @@
         : `确定要移除仓库「${currentWarehouse}」吗？`;
 
       if (confirm(confirmMsg)) {
-        warehouses = warehouses.filter(w => w !== currentWarehouse);
-        items = items.filter(it => it.warehouse !== currentWarehouse);
+        const oldName = currentWarehouse;
+        warehouses = warehouses.filter(w => w !== oldName);
+        items = items.filter(it => it.warehouse !== oldName);
+        delete convertState[oldName];
+        
         currentWarehouse = warehouses[0];
         save(); renderAll();
         showToast('🗑️ 仓库已移除');
@@ -705,6 +1308,7 @@
           if (d.items) items = d.items;
           if (d.itemCodes) itemCodes = d.itemCodes;
           if (d.itemRates) itemRates = d.itemRates;
+          if (d.convertState) convertState = d.convertState;
           
           if (!warehouses.includes(currentWarehouse) && warehouses.length > 0) {
             currentWarehouse = warehouses[0];
@@ -723,6 +1327,7 @@
     $('clear-items-btn').addEventListener('click', () => {
       if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
         items = []; 
+        convertState = {}; 
         $('convert-textarea').value = '';
         $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
         save();
