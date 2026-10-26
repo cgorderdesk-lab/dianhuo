@@ -46,11 +46,11 @@
     .btn:active { opacity: 0.7; }
     
     /* 表单输入 */
-    textarea {
+    textarea, .modal-input {
       width: 100%; padding: 12px; border: 1.5px solid #d1d1d6; border-radius: 10px;
-      font-size: 16px; font-family: inherit; background: #fafafa; margin-bottom: 12px; resize: vertical;
+      font-size: 16px; font-family: inherit; background: #fafafa; margin-bottom: 12px; resize: vertical; outline: none;
     }
-    textarea:focus { outline: none; border-color: var(--primary); background: white; }
+    textarea:focus, .modal-input:focus { border-color: var(--primary); background: white; }
     
     /* 列表样式 */
     ul { list-style: none; padding: 0; margin: 0; }
@@ -93,25 +93,15 @@
     .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
     .toast.show { opacity: 1; }
 
-    /* ======= 弹窗样式 ======= */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.2s;
-    }
-    .modal-overlay.show { opacity: 1; pointer-events: auto; }
-    .modal-box {
-      background: white; width: 85%; max-width: 340px;
-      border-radius: 16px; padding: 20px;
-      transform: scale(0.95); transition: transform 0.2s;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
-    .modal-overlay.show .modal-box { transform: scale(1); }
-    .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; text-align: center; color: #1d1d1f; }
-    .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-    .modal-actions .btn { padding: 12px; font-size: 15px; border-radius: 10px; }
-    .modal-cancel { background: #e5e5ea; color: #1d1d1f; }
+    /* ======= 新增：彈出層與選單樣式 ======= */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 300; backdrop-filter: blur(2px); }
+    .modal-overlay.active { display: flex; }
+    .modal-content { background: white; width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center; }
+    .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; color: #1d1d1f; }
+    .menu-btn { display: block; width: 100%; padding: 14px; margin-bottom: 10px; background: #f5f5f7; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; color: #1d1d1f; cursor: pointer; text-align: left; padding-left: 20px; }
+    .menu-btn:active { background: #e5e5ea; }
+    .menu-btn.danger { color: var(--danger); background: rgba(255,59,48,0.1); }
+    .menu-btn.cancel { text-align: center; background: transparent; color: #86868b; margin-top: 5px; padding-left: 0; }
   </style>
 </head>
 <body>
@@ -120,7 +110,7 @@
   <div id="page-pointing" class="page active">
     <h1>
       📦 点货
-      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea; cursor:pointer;">✏️ 管理仓库</button>
+      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 管理仓库</button>
     </h1>
     <div class="warehouse-selector" id="warehouse-selector"></div>
     
@@ -218,16 +208,26 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- ======= 仓库管理弹窗 ======= -->
-  <div class="modal-overlay" id="wh-modal">
-    <div class="modal-box">
-      <div class="modal-title">仓库管理</div>
-      <div class="modal-actions">
-        <button class="btn btn-primary" id="modal-rename-btn">✏️ 修改当前仓名</button>
-        <button class="btn btn-success" id="modal-add-btn">➕ 新增仓库</button>
-        <button class="btn btn-danger" id="modal-remove-btn">🗑️ 移除当前仓库</button>
+  <!-- ======= 新增：倉庫管理選單彈出層 ======= -->
+  <div id="wh-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-title">🏢 仓库管理</div>
+      <button class="menu-btn" id="menu-rename">✏️ 修改当前仓库名称</button>
+      <button class="menu-btn" id="menu-add">➕ 新增仓库</button>
+      <button class="menu-btn danger" id="menu-remove">🗑️ 移除当前仓库</button>
+      <button class="menu-btn cancel" id="menu-cancel">取消</button>
+    </div>
+  </div>
+
+  <!-- ======= 新增：通用輸入彈出層 (取代原生 prompt) ======= -->
+  <div id="input-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-title" id="input-title">提示</div>
+      <input type="text" id="input-value" class="modal-input">
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn" id="input-cancel" style="flex: 1; background: #e5e5ea; color: #1d1d1f;">取消</button>
+        <button class="btn btn-primary" id="input-confirm" style="flex: 1;">确定</button>
       </div>
-      <button class="btn modal-cancel btn-block" id="modal-cancel-btn">取消</button>
     </div>
   </div>
 
@@ -245,6 +245,30 @@
     const $ = id => document.getElementById(id);
     const toastEl = $('toast');
 
+    // ----- 輸入框彈窗邏輯 -----
+    let inputCallback = null;
+    function showInputModal(title, defaultValue, callback) {
+      $('input-title').textContent = title;
+      $('input-value').value = defaultValue || '';
+      $('input-modal').classList.add('active');
+      setTimeout(() => $('input-value').focus(), 100);
+      inputCallback = callback;
+    }
+    $('input-cancel').onclick = () => {
+      $('input-modal').classList.remove('active');
+      inputCallback = null;
+    };
+    $('input-confirm').onclick = () => {
+      const val = $('input-value').value.trim();
+      $('input-modal').classList.remove('active');
+      if (inputCallback) inputCallback(val);
+      inputCallback = null;
+    };
+    $('input-value').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('input-confirm').click();
+    });
+
+    // ----- 核心邏輯 -----
     function cnToNum(cn) {
       if (!cn) return 0;
       if (!isNaN(cn)) return parseFloat(cn);
@@ -586,67 +610,54 @@
       }
     });
 
-    // ======== 仓库管理弹窗逻辑 ========
-    const whModal = $('wh-modal');
-
+    // ======== 倉庫管理選單邏輯 ========
     $('manage-wh-btn').addEventListener('click', () => {
-      whModal.classList.add('show');
+      $('wh-modal').classList.add('active');
     });
 
-    $('modal-cancel-btn').addEventListener('click', () => {
-      whModal.classList.remove('show');
-    });
+    $('menu-cancel').onclick = () => $('wh-modal').classList.remove('active');
 
-    // 点击遮罩层关闭弹窗
-    whModal.addEventListener('click', (e) => {
-      if (e.target === whModal) whModal.classList.remove('show');
-    });
-
-    // 1. 修改仓名
-    $('modal-rename-btn').addEventListener('click', () => {
-      whModal.classList.remove('show');
-      const newName = prompt(`请输入新的仓库名称（当前：${currentWarehouse}）：`, currentWarehouse);
-      if (newName && newName.trim() !== '' && newName !== currentWarehouse) {
-        const trimmed = newName.trim();
-        if (warehouses.includes(trimmed)) {
+    // 1. 修改倉名
+    $('menu-rename').onclick = () => {
+      $('wh-modal').classList.remove('active');
+      showInputModal('修改当前仓库名称', currentWarehouse, (newName) => {
+        if (!newName || newName === currentWarehouse) return;
+        if (warehouses.includes(newName)) {
           showToast('该仓库名称已存在');
           return;
         }
         const idx = warehouses.indexOf(currentWarehouse);
-        if (idx !== -1) warehouses[idx] = trimmed;
-        items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = trimmed; });
-        currentWarehouse = trimmed;
+        if (idx !== -1) warehouses[idx] = newName;
+        items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = newName; });
+        currentWarehouse = newName;
         save(); renderAll();
         showToast('✅ 仓库名称已修改');
-      }
-    });
+      });
+    };
 
-    // 2. 新增仓库
-    $('modal-add-btn').addEventListener('click', () => {
-      whModal.classList.remove('show');
-      const newName = prompt('请输入新仓库名称：');
-      if (newName && newName.trim() !== '') {
-        const trimmed = newName.trim();
-        if (warehouses.includes(trimmed)) {
+    // 2. 新增倉庫
+    $('menu-add').onclick = () => {
+      $('wh-modal').classList.remove('active');
+      showInputModal('新增仓库', '', (newName) => {
+        if (!newName) return;
+        if (warehouses.includes(newName)) {
           showToast('该仓库已存在');
           return;
         }
-        warehouses.push(trimmed);
-        currentWarehouse = trimmed; // 自动切换过去
+        warehouses.push(newName);
+        currentWarehouse = newName;
         save(); renderAll();
         showToast('✅ 新仓库已添加');
-      }
-    });
+      });
+    };
 
-    // 3. 移除当前仓库
-    $('modal-remove-btn').addEventListener('click', () => {
-      whModal.classList.remove('show');
-      
+    // 3. 移除倉庫
+    $('menu-remove').onclick = () => {
+      $('wh-modal').classList.remove('active');
       if (warehouses.length <= 1) {
         showToast('⚠️ 必须保留至少一个仓库');
         return;
       }
-      
       const itemCount = items.filter(it => it.warehouse === currentWarehouse).length;
       const confirmMsg = itemCount > 0 
         ? `⚠️ 仓库「${currentWarehouse}」中有 ${itemCount} 条点货记录，移除后这些记录将被永久删除！\n\n确定要移除吗？`
@@ -659,7 +670,7 @@
         save(); renderAll();
         showToast('🗑️ 仓库已移除');
       }
-    });
+    };
 
     // ======== 数据备份与清理 ========
 
@@ -720,7 +731,7 @@
       }
     });
 
-    // 启动
+    // 啟動
     load();
     renderAll();
   })();
