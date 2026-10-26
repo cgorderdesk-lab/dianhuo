@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23007aff'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='system-ui'>点</text></svg>">
   <title>点货系统</title>
   <style>
-    :root { --primary: #007aff; --bg: #f5f5f7; --text: #1d1d1f; --card: #ffffff; --success: #34c759; }
+    :root { --primary: #007aff; --bg: #f5f5f7; --text: #1d1d1f; --card: #ffffff; --success: #34c759; --danger: #ff3b30; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -41,6 +41,7 @@
     .btn { padding: 14px 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity 0.15s; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
     .btn-block { width: 100%; }
     .btn:active { opacity: 0.7; }
     
@@ -55,7 +56,7 @@
     ul { list-style: none; padding: 0; margin: 0; }
     li { padding: 12px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
     li:last-child { border-bottom: none; }
-    .delete-btn { background: none; border: none; color: #ff3b30; font-size: 18px; padding: 8px; cursor: pointer; }
+    .delete-btn { background: none; border: none; color: var(--danger); font-size: 18px; padding: 8px; cursor: pointer; }
 
     /* 仓库选择 */
     .warehouse-selector { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -86,7 +87,7 @@
     /* 设置页表格 */
     .setting-row { display: flex; gap: 8px; margin-bottom: 8px; }
     .setting-row input { margin-bottom: 0; flex: 1; padding: 8px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 15px;}
-    .setting-row button { width: 48px; flex-shrink: 0; background: #ff3b30; color: white; border: none; border-radius: 8px; font-size: 20px; }
+    .setting-row button { width: 48px; flex-shrink: 0; background: var(--danger); color: white; border: none; border-radius: 8px; font-size: 20px; }
     .setting-row button.add { background: var(--primary); }
 
     .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
@@ -160,6 +161,26 @@
       <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">系统在转换页自动记录的（品名+单位）专属倍率。</div>
       <ul id="item-rate-list" style="padding: 0; margin-bottom: 12px;"></ul>
     </div>
+
+    <!-- 新增：数据备份与恢复 -->
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">💾 数据备份与恢复</h3>
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">换手机时，在此导出代码并长按复制。在新手机上粘贴并导入即可恢复。</div>
+      
+      <textarea id="backup-data" rows="3" placeholder="点击下方导出，或在此粘贴备份代码后点击导入..." style="font-family: monospace; font-size: 12px; margin-bottom: 8px;"></textarea>
+      
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-primary" id="export-btn" style="flex: 1; font-size: 14px; padding: 10px;">📤 导出备份</button>
+        <button class="btn btn-success" id="import-btn" style="flex: 1; font-size: 14px; padding: 10px;">📥 导入恢复</button>
+      </div>
+    </div>
+
+    <!-- 新增：危险操作（清理空间） -->
+    <div class="card" style="border: 1px solid #ff3b30;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #ff3b30;">⚠️ 危险操作</h3>
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">当数据太多导致手机卡顿或空间不足时使用。点击将清空所有“点货记录”及“转换页内容”，仅保留货仓名称与记忆数据。</div>
+      <button class="btn btn-danger btn-block" id="clear-items-btn">🗑️ 清除点货及转换数据</button>
+    </div>
   </div>
 
   <!-- 底部导航 -->
@@ -181,18 +202,16 @@
   (function() {
     'use strict';
 
-    // 状态数据
-    const STORAGE_KEY = 'dianhuo_data_v7'; // 升级版本号，避免旧数据干扰
+    const STORAGE_KEY = 'dianhuo_data_v7'; 
     let warehouses = ['A仓', 'B仓', 'C仓'];
     let currentWarehouse = 'A仓';
     let items = []; 
-    let itemCodes = {}; // 货物名 -> CODE
-    let itemRates = {}; // 专属倍率记录 (key: 货名_单位) 例如 { '72裝橙_箱': 72 }
+    let itemCodes = {}; 
+    let itemRates = {}; 
 
     const $ = id => document.getElementById(id);
     const toastEl = $('toast');
 
-    // 工具：中文数字转阿拉伯
     function cnToNum(cn) {
       if (!cn) return 0;
       if (!isNaN(cn)) return parseFloat(cn);
@@ -207,7 +226,6 @@
       return cnNums[cn] || 0;
     }
 
-    // 工具：Toast
     let toastTimer;
     function showToast(msg) {
       toastEl.textContent = msg;
@@ -216,11 +234,12 @@
       toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
     }
 
-    // 存储与读取
     function save() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouses, currentWarehouse, items, itemCodes, itemRates }));
-      } catch(e){}
+      } catch(e){
+        showToast('存储空间不足，请去设置清理数据');
+      }
     }
     function load() {
       try {
@@ -236,14 +255,11 @@
       } catch(e){}
     }
 
-    // 通用 HTML 转义
     function escapeHtml(s) {
       const d = document.createElement('div');
       d.textContent = s;
       return d.innerHTML;
     }
-
-    // ---------- UI 渲染 ----------
 
     function renderWarehouses() {
       const render = (containerId) => {
@@ -283,7 +299,6 @@
     }
 
     function renderSettings() {
-      // 渲染 CODE
       const ulIC = $('item-code-list');
       ulIC.innerHTML = '';
       const icKeys = Object.keys(itemCodes);
@@ -300,7 +315,6 @@
         });
       }
 
-      // 渲染 专属倍率
       const ulIR = $('item-rate-list');
       ulIR.innerHTML = '';
       const irKeys = Object.keys(itemRates);
@@ -327,8 +341,6 @@
     window.deleteIC = function(key) { delete itemCodes[key]; save(); renderSettings(); };
     window.deleteIR = function(key) { delete itemRates[key]; save(); renderSettings(); };
 
-    // ---------- 核心功能：倒序扫描解析 ----------
-    
     function parseLine(text) {
       const cleanText = text.replace(/[\u200b-\u200f\u202a-\u202e\ufeff]/g, '').trim();
       const cnNums = '零一二三四五六七八九十百千万两';
@@ -380,7 +392,6 @@
         return;
       }
 
-      // 构建 4 列表格
       let tableHTML = `
         <table class="result-table">
           <thead>
@@ -408,7 +419,6 @@
         const { name, unit, rawQty, original } = parsed;
         const code = itemCodes[name] || '';
         
-        // 获取该物品的专属倍率 (key: 货名_单位)
         const rateKey = name + '_' + unit;
         const savedRate = itemRates[rateKey];
         const initRate = savedRate !== undefined ? savedRate : 1; 
@@ -428,7 +438,6 @@
       container.innerHTML = tableHTML;
     }
 
-    // 监听表格内的输入变化，双向计算并实时保存记忆
     $('convert-results').addEventListener('input', (e) => {
       const input = e.target;
       const tr = input.closest('.data-row');
@@ -444,7 +453,6 @@
       const rateInput = tr.querySelector('.inp-rate');
       const qtyInput = tr.querySelector('.inp-qty');
 
-      // 1. 修改了 CODE
       if (input.classList.contains('inp-code')) {
         const codeVal = codeInput.value.trim();
         if (codeVal) itemCodes[name] = codeVal;
@@ -452,44 +460,27 @@
         save();
       }
 
-      // 2. 修改了 专属倍率 -> 重算数量
       if (input.classList.contains('inp-rate')) {
         const newRate = parseFloat(rateInput.value);
         if (!isNaN(newRate)) {
-          if (newRate === 1) {
-            delete itemRates[rateKey]; // 1 是默认值，不用保存
-          } else {
-            itemRates[rateKey] = newRate;
-          }
+          if (newRate === 1) delete itemRates[rateKey];
+          else itemRates[rateKey] = newRate;
           save();
-          
-          // 自动计算并更新 QUANTITY
           qtyInput.value = parseFloat((rawQty * newRate).toFixed(4));
         }
       }
 
-      // 3. 修改了 QUANTITY -> 反推倍率（你的核心需求）
       if (input.classList.contains('inp-qty')) {
         const newQty = parseFloat(qtyInput.value);
         if (!isNaN(newQty) && rawQty > 0) {
-          // 计算倍率 = 输入的总数 / 解析出的原始数量
           const calculatedRate = parseFloat((newQty / rawQty).toFixed(4));
-          
-          // 更新倍率输入框
           rateInput.value = calculatedRate;
-          
-          // 保存记忆
-          if (calculatedRate === 1) {
-            delete itemRates[rateKey];
-          } else {
-            itemRates[rateKey] = calculatedRate;
-          }
+          if (calculatedRate === 1) delete itemRates[rateKey];
+          else itemRates[rateKey] = calculatedRate;
           save();
         }
       }
     });
-
-    // ---------- 事件绑定 ----------
 
     const transcript = $('transcript');
     const addBtn = $('add-btn');
@@ -569,6 +560,69 @@
         items.forEach(it => { if (it.warehouse === oldName) it.warehouse = trimmedName; });
         currentWarehouse = trimmedName;
         save(); renderAll();
+      }
+    });
+
+    // ---------- 数据备份、恢复与清理 ----------
+
+    $('export-btn').addEventListener('click', () => {
+      const dataStr = localStorage.getItem(STORAGE_KEY) || '{}';
+      try {
+        const base64Str = btoa(encodeURIComponent(dataStr));
+        $('backup-data').value = base64Str;
+        $('backup-data').select();
+        document.execCommand('copy'); 
+        showToast('已生成备份代码，请妥善保存');
+      } catch(err) {
+        showToast('导出失败，请重试');
+      }
+    });
+
+    $('import-btn').addEventListener('click', () => {
+      const backupStr = $('backup-data').value.trim();
+      if (!backupStr) {
+        showToast('请先粘贴备份代码');
+        return;
+      }
+      try {
+        const jsonStr = decodeURIComponent(atob(backupStr));
+        const d = JSON.parse(jsonStr);
+        
+        if (!d.items || !d.itemCodes) throw new Error('无效格式');
+
+        if (confirm('导入将覆盖当前所有数据，确定继续吗？')) {
+          if (d.warehouses) warehouses = d.warehouses;
+          if (d.currentWarehouse) currentWarehouse = d.currentWarehouse;
+          if (d.items) items = d.items;
+          if (d.itemCodes) itemCodes = d.itemCodes;
+          if (d.itemRates) itemRates = d.itemRates;
+          
+          save();
+          renderAll();
+          $('backup-data').value = '';
+          showToast('✅ 导入成功！数据已恢复');
+        }
+      } catch (e) {
+        showToast('❌ 无效的备份代码，请检查是否复制完整');
+      }
+    });
+
+    // 3. 清除所有点货记录及转换页内容 (保留记忆数据)
+    $('clear-items-btn').addEventListener('click', () => {
+      if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
+        // 1. 清空点货记录
+        items = []; 
+        
+        // 2. 清空转换页的文本输入框
+        $('convert-textarea').value = '';
+        
+        // 3. 重置转换结果区域为初始状态
+        $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
+        
+        // 4. 保存并重新渲染列表
+        save();
+        renderItems();
+        showToast('🗑️ 点货和转换数据已清空');
       }
     });
 
