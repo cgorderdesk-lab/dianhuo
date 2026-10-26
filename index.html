@@ -100,7 +100,7 @@
   <div id="page-pointing" class="page active">
     <h1>
       📦 点货
-      <button id="rename-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 改仓名</button>
+      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 管理仓库</button>
     </h1>
     <div class="warehouse-selector" id="warehouse-selector"></div>
     
@@ -162,7 +162,7 @@
       <ul id="item-rate-list" style="padding: 0; margin-bottom: 12px;"></ul>
     </div>
 
-    <!-- 新增：数据备份与恢复 -->
+    <!-- 数据备份与恢复 -->
     <div class="card">
       <h3 style="margin-top: 0; font-size: 16px;">💾 数据备份与恢复</h3>
       <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">换手机时，在此导出代码并长按复制。在新手机上粘贴并导入即可恢复。</div>
@@ -175,7 +175,7 @@
       </div>
     </div>
 
-    <!-- 新增：危险操作（清理空间） -->
+    <!-- 危险操作（清理空间） -->
     <div class="card" style="border: 1px solid #ff3b30;">
       <h3 style="margin-top: 0; font-size: 16px; color: #ff3b30;">⚠️ 危险操作</h3>
       <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">当数据太多导致手机卡顿或空间不足时使用。点击将清空所有“点货记录”及“转换页内容”，仅保留货仓名称与记忆数据。</div>
@@ -246,12 +246,16 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const d = JSON.parse(raw);
-        if (d.warehouses) warehouses = d.warehouses;
+        if (d.warehouses && d.warehouses.length > 0) warehouses = d.warehouses;
         if (d.currentWarehouse) currentWarehouse = d.currentWarehouse;
         if (d.items) items = d.items;
         if (d.itemCodes) itemCodes = d.itemCodes;
         if (d.itemRates) itemRates = d.itemRates;
-        if (!warehouses.includes(currentWarehouse)) warehouses.push(currentWarehouse);
+        
+        // 确保当前仓库存在于仓库列表中
+        if (!warehouses.includes(currentWarehouse)) {
+          currentWarehouse = warehouses[0];
+        }
       } catch(e){}
     }
 
@@ -550,20 +554,75 @@
       }
     });
 
-    $('rename-wh-btn').addEventListener('click', () => {
-      const oldName = currentWarehouse;
-      const newName = prompt(`请输入新的仓名（当前：${oldName}）：`, oldName);
-      if (newName && newName.trim() !== '' && newName !== oldName) {
-        const trimmedName = newName.trim();
-        const idx = warehouses.indexOf(oldName);
-        if (idx !== -1) warehouses[idx] = trimmedName;
-        items.forEach(it => { if (it.warehouse === oldName) it.warehouse = trimmedName; });
-        currentWarehouse = trimmedName;
-        save(); renderAll();
+    // ======== 仓库管理功能 ========
+    $('manage-wh-btn').addEventListener('click', () => {
+      const action = prompt(
+        `【仓库管理】当前仓库：${currentWarehouse}\n\n` +
+        `请输入数字选择操作：\n` +
+        `1. 修改当前仓库名称\n` +
+        `2. 新增仓库\n` +
+        `3. 移除当前仓库\n\n` +
+        `(直接取消则退出)`
+      );
+      
+      if (action === null) return;
+
+      if (action === '1') {
+        const newName = prompt(`请输入新的仓库名称：`, currentWarehouse);
+        if (newName && newName.trim() !== '' && newName !== currentWarehouse) {
+          const trimmed = newName.trim();
+          if (warehouses.includes(trimmed)) {
+            showToast('该仓库名称已存在');
+            return;
+          }
+          const idx = warehouses.indexOf(currentWarehouse);
+          if (idx !== -1) warehouses[idx] = trimmed;
+          items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = trimmed; });
+          currentWarehouse = trimmed;
+          save(); renderAll();
+          showToast('✅ 仓库名称已修改');
+        }
+      } 
+      else if (action === '2') {
+        const newName = prompt('请输入新仓库名称：');
+        if (newName && newName.trim() !== '') {
+          const trimmed = newName.trim();
+          if (warehouses.includes(trimmed)) {
+            showToast('该仓库已存在');
+            return;
+          }
+          warehouses.push(trimmed);
+          currentWarehouse = trimmed; // 自动切换过去
+          save(); renderAll();
+          showToast('✅ 新仓库已添加');
+        }
+      } 
+      else if (action === '3') {
+        if (warehouses.length <= 1) {
+          showToast('⚠️ 必须保留至少一个仓库');
+          return;
+        }
+        
+        // 统计该仓库有多少条记录，用于提示
+        const itemCount = items.filter(it => it.warehouse === currentWarehouse).length;
+        const confirmMsg = itemCount > 0 
+          ? `⚠️ 仓库「${currentWarehouse}」中有 ${itemCount} 条点货记录，移除后这些记录将被永久删除！\n\n确定要移除吗？`
+          : `确定要移除仓库「${currentWarehouse}」吗？`;
+
+        if (confirm(confirmMsg)) {
+          // 1. 从仓库列表移除
+          warehouses = warehouses.filter(w => w !== currentWarehouse);
+          // 2. 清空该仓库的所有点货记录
+          items = items.filter(it => it.warehouse !== currentWarehouse);
+          // 3. 切换到第一个可用仓库
+          currentWarehouse = warehouses[0];
+          save(); renderAll();
+          showToast('🗑️ 仓库已移除');
+        }
       }
     });
 
-    // ---------- 数据备份、恢复与清理 ----------
+    // ======== 数据备份与清理 ========
 
     $('export-btn').addEventListener('click', () => {
       const dataStr = localStorage.getItem(STORAGE_KEY) || '{}';
@@ -597,6 +656,10 @@
           if (d.itemCodes) itemCodes = d.itemCodes;
           if (d.itemRates) itemRates = d.itemRates;
           
+          if (!warehouses.includes(currentWarehouse) && warehouses.length > 0) {
+            currentWarehouse = warehouses[0];
+          }
+
           save();
           renderAll();
           $('backup-data').value = '';
@@ -607,19 +670,11 @@
       }
     });
 
-    // 3. 清除所有点货记录及转换页内容 (保留记忆数据)
     $('clear-items-btn').addEventListener('click', () => {
       if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
-        // 1. 清空点货记录
         items = []; 
-        
-        // 2. 清空转换页的文本输入框
         $('convert-textarea').value = '';
-        
-        // 3. 重置转换结果区域为初始状态
         $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
-        
-        // 4. 保存并重新渲染列表
         save();
         renderItems();
         showToast('🗑️ 点货和转换数据已清空');
