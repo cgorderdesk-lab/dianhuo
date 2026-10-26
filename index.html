@@ -92,6 +92,26 @@
 
     .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
     .toast.show { opacity: 1; }
+
+    /* ======= 弹窗样式 ======= */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: auto; }
+    .modal-box {
+      background: white; width: 85%; max-width: 340px;
+      border-radius: 16px; padding: 20px;
+      transform: scale(0.95); transition: transform 0.2s;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal-overlay.show .modal-box { transform: scale(1); }
+    .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; text-align: center; color: #1d1d1f; }
+    .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .modal-actions .btn { padding: 12px; font-size: 15px; border-radius: 10px; }
+    .modal-cancel { background: #e5e5ea; color: #1d1d1f; }
   </style>
 </head>
 <body>
@@ -100,7 +120,7 @@
   <div id="page-pointing" class="page active">
     <h1>
       📦 点货
-      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 管理仓库</button>
+      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea; cursor:pointer;">✏️ 管理仓库</button>
     </h1>
     <div class="warehouse-selector" id="warehouse-selector"></div>
     
@@ -198,6 +218,19 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- ======= 仓库管理弹窗 ======= -->
+  <div class="modal-overlay" id="wh-modal">
+    <div class="modal-box">
+      <div class="modal-title">仓库管理</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="modal-rename-btn">✏️ 修改当前仓名</button>
+        <button class="btn btn-success" id="modal-add-btn">➕ 新增仓库</button>
+        <button class="btn btn-danger" id="modal-remove-btn">🗑️ 移除当前仓库</button>
+      </div>
+      <button class="btn modal-cancel btn-block" id="modal-cancel-btn">取消</button>
+    </div>
+  </div>
+
   <script>
   (function() {
     'use strict';
@@ -252,7 +285,6 @@
         if (d.itemCodes) itemCodes = d.itemCodes;
         if (d.itemRates) itemRates = d.itemRates;
         
-        // 确保当前仓库存在于仓库列表中
         if (!warehouses.includes(currentWarehouse)) {
           currentWarehouse = warehouses[0];
         }
@@ -554,71 +586,78 @@
       }
     });
 
-    // ======== 仓库管理功能 ========
-    $('manage-wh-btn').addEventListener('click', () => {
-      const action = prompt(
-        `【仓库管理】当前仓库：${currentWarehouse}\n\n` +
-        `请输入数字选择操作：\n` +
-        `1. 修改当前仓库名称\n` +
-        `2. 新增仓库\n` +
-        `3. 移除当前仓库\n\n` +
-        `(直接取消则退出)`
-      );
-      
-      if (action === null) return;
+    // ======== 仓库管理弹窗逻辑 ========
+    const whModal = $('wh-modal');
 
-      if (action === '1') {
-        const newName = prompt(`请输入新的仓库名称：`, currentWarehouse);
-        if (newName && newName.trim() !== '' && newName !== currentWarehouse) {
-          const trimmed = newName.trim();
-          if (warehouses.includes(trimmed)) {
-            showToast('该仓库名称已存在');
-            return;
-          }
-          const idx = warehouses.indexOf(currentWarehouse);
-          if (idx !== -1) warehouses[idx] = trimmed;
-          items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = trimmed; });
-          currentWarehouse = trimmed;
-          save(); renderAll();
-          showToast('✅ 仓库名称已修改');
-        }
-      } 
-      else if (action === '2') {
-        const newName = prompt('请输入新仓库名称：');
-        if (newName && newName.trim() !== '') {
-          const trimmed = newName.trim();
-          if (warehouses.includes(trimmed)) {
-            showToast('该仓库已存在');
-            return;
-          }
-          warehouses.push(trimmed);
-          currentWarehouse = trimmed; // 自动切换过去
-          save(); renderAll();
-          showToast('✅ 新仓库已添加');
-        }
-      } 
-      else if (action === '3') {
-        if (warehouses.length <= 1) {
-          showToast('⚠️ 必须保留至少一个仓库');
+    $('manage-wh-btn').addEventListener('click', () => {
+      whModal.classList.add('show');
+    });
+
+    $('modal-cancel-btn').addEventListener('click', () => {
+      whModal.classList.remove('show');
+    });
+
+    // 点击遮罩层关闭弹窗
+    whModal.addEventListener('click', (e) => {
+      if (e.target === whModal) whModal.classList.remove('show');
+    });
+
+    // 1. 修改仓名
+    $('modal-rename-btn').addEventListener('click', () => {
+      whModal.classList.remove('show');
+      const newName = prompt(`请输入新的仓库名称（当前：${currentWarehouse}）：`, currentWarehouse);
+      if (newName && newName.trim() !== '' && newName !== currentWarehouse) {
+        const trimmed = newName.trim();
+        if (warehouses.includes(trimmed)) {
+          showToast('该仓库名称已存在');
           return;
         }
-        
-        // 统计该仓库有多少条记录，用于提示
-        const itemCount = items.filter(it => it.warehouse === currentWarehouse).length;
-        const confirmMsg = itemCount > 0 
-          ? `⚠️ 仓库「${currentWarehouse}」中有 ${itemCount} 条点货记录，移除后这些记录将被永久删除！\n\n确定要移除吗？`
-          : `确定要移除仓库「${currentWarehouse}」吗？`;
+        const idx = warehouses.indexOf(currentWarehouse);
+        if (idx !== -1) warehouses[idx] = trimmed;
+        items.forEach(it => { if (it.warehouse === currentWarehouse) it.warehouse = trimmed; });
+        currentWarehouse = trimmed;
+        save(); renderAll();
+        showToast('✅ 仓库名称已修改');
+      }
+    });
 
-        if (confirm(confirmMsg)) {
-          // 1. 从仓库列表移除
-          warehouses = warehouses.filter(w => w !== currentWarehouse);
-          // 2. 清空该仓库的所有点货记录
-          items = items.filter(it => it.warehouse !== currentWarehouse);
-          // 3. 切换到第一个可用仓库
-          currentWarehouse = warehouses[0];
-          save(); renderAll();
-          showToast('🗑️ 仓库已移除');
+    // 2. 新增仓库
+    $('modal-add-btn').addEventListener('click', () => {
+      whModal.classList.remove('show');
+      const newName = prompt('请输入新仓库名称：');
+      if (newName && newName.trim() !== '') {
+        const trimmed = newName.trim();
+        if (warehouses.includes(trimmed)) {
+          showToast('该仓库已存在');
+          return;
         }
+        warehouses.push(trimmed);
+        currentWarehouse = trimmed; // 自动切换过去
+        save(); renderAll();
+        showToast('✅ 新仓库已添加');
+      }
+    });
+
+    // 3. 移除当前仓库
+    $('modal-remove-btn').addEventListener('click', () => {
+      whModal.classList.remove('show');
+      
+      if (warehouses.length <= 1) {
+        showToast('⚠️ 必须保留至少一个仓库');
+        return;
+      }
+      
+      const itemCount = items.filter(it => it.warehouse === currentWarehouse).length;
+      const confirmMsg = itemCount > 0 
+        ? `⚠️ 仓库「${currentWarehouse}」中有 ${itemCount} 条点货记录，移除后这些记录将被永久删除！\n\n确定要移除吗？`
+        : `确定要移除仓库「${currentWarehouse}」吗？`;
+
+      if (confirm(confirmMsg)) {
+        warehouses = warehouses.filter(w => w !== currentWarehouse);
+        items = items.filter(it => it.warehouse !== currentWarehouse);
+        currentWarehouse = warehouses[0];
+        save(); renderAll();
+        showToast('🗑️ 仓库已移除');
       }
     });
 
@@ -640,51 +679,4 @@
     $('import-btn').addEventListener('click', () => {
       const backupStr = $('backup-data').value.trim();
       if (!backupStr) {
-        showToast('请先粘贴备份代码');
-        return;
-      }
-      try {
-        const jsonStr = decodeURIComponent(atob(backupStr));
-        const d = JSON.parse(jsonStr);
-        
-        if (!d.items || !d.itemCodes) throw new Error('无效格式');
-
-        if (confirm('导入将覆盖当前所有数据，确定继续吗？')) {
-          if (d.warehouses) warehouses = d.warehouses;
-          if (d.currentWarehouse) currentWarehouse = d.currentWarehouse;
-          if (d.items) items = d.items;
-          if (d.itemCodes) itemCodes = d.itemCodes;
-          if (d.itemRates) itemRates = d.itemRates;
-          
-          if (!warehouses.includes(currentWarehouse) && warehouses.length > 0) {
-            currentWarehouse = warehouses[0];
-          }
-
-          save();
-          renderAll();
-          $('backup-data').value = '';
-          showToast('✅ 导入成功！数据已恢复');
-        }
-      } catch (e) {
-        showToast('❌ 无效的备份代码，请检查是否复制完整');
-      }
-    });
-
-    $('clear-items-btn').addEventListener('click', () => {
-      if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
-        items = []; 
-        $('convert-textarea').value = '';
-        $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
-        save();
-        renderItems();
-        showToast('🗑️ 点货和转换数据已清空');
-      }
-    });
-
-    // 启动
-    load();
-    renderAll();
-  })();
-  </script>
-</body>
-</html>
+        showToast('
