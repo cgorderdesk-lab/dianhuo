@@ -90,7 +90,21 @@
     .setting-row button { width: 48px; flex-shrink: 0; background: var(--danger); color: white; border: none; border-radius: 8px; font-size: 20px; }
     .setting-row button.add { background: var(--primary); }
 
-    .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 200; }
+    .toast { 
+      position: fixed; 
+      bottom: 80px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: #1d1d1f; 
+      color: white; 
+      padding: 10px 20px; 
+      border-radius: 20px; 
+      font-size: 14px; 
+      opacity: 0; 
+      transition: opacity 0.25s; 
+      pointer-events: none; 
+      z-index: 10000; /* 👈 把 200 改成 10000 */
+    }
     .toast.show { opacity: 1; }
 
     /* ======= 彈出層與選單樣式 ======= */
@@ -113,6 +127,25 @@
     
     /* 新品紅色樣式 */
     .text-new-item { color: #ff3b30 !important; font-weight: bold; }
+
+    
+    /* ======= 自訂數字鍵盤與單位選單樣式 (乾淨白底風格) ======= */
+    .numpad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .numpad-btn { background: #ffffff; border: 1px solid #d1d1d6; border-radius: 6px; padding: 14px 0; font-size: 26px; font-weight: 400; color: #1d1d1f; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; }
+    .numpad-btn:active { background: #e5e5ea; transform: scale(0.98); }
+    .numpad-btn.action { color: #ff3b30; font-size: 22px; }
+    .numpad-btn.confirm { background: var(--primary, #007aff); color: white; border-color: var(--primary, #007aff); }
+    .numpad-btn.confirm:active { background: #005bb5; }
+
+    .unit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+    .unit-btn { background: #ffffff; border: 1px solid #d1d1d6; border-radius: 6px; padding: 14px; font-size: 20px; font-weight: 400; color: #1d1d1f; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .unit-btn:active { background: #e5e5ea; }
+    
+    /* 讓假的輸入框看起來像真的輸入框 */
+    .pseudo-input { flex: 1; padding: 12px; border: 1.5px solid #d1d1d6; border-radius: 8px; font-size: 18px; background: white; text-align: center; color: #1d1d1f; cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 48px; }
+    .pseudo-input.empty { color: #86868b; }
+    .pseudo-input.disabled { background: #f5f5f7; color: #86868b; cursor: not-allowed; border-color: #e5e5ea; }
+
   </style>
 </head>
 <body>
@@ -120,59 +153,81 @@
   <!-- ================= 页面 1：点货页 ================= -->
   <div id="page-pointing" class="page active">
     <h1>
-      📦 点货
-      <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 管理仓库</button>
+      <div>📦 点货</div>
+      <div style="display:flex; align-items:center;">
+        <span class="user-display" style="font-size:15px; color:var(--primary); font-weight:bold; margin-right:12px;"></span>
+        <button id="unlock-wh-btn" style="display:none; font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#ff9500; color:white; font-weight:bold; margin-right:4px;">🔓 解锁仓库</button>
+        <button id="add-manual-item-btn" style="display:none; font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold; margin-right:4px;">➕ 添加</button>
+        <button id="manage-wh-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#e5e5ea;">✏️ 管理仓库</button>
+      </div>
     </h1>
-    <div class="warehouse-selector" id="warehouse-selector"></div>
-    
-    <div class="card">
-      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">💡 听写后按键盘右下角“发送”</div>
-      <textarea id="transcript" placeholder="例如：72裝橙九箱、紅毛50K..." enterkeyhint="send" rows="3"></textarea>
-      <button class="btn btn-primary btn-block" id="add-btn">添加记录</button>
-      <button class="btn btn-success btn-block" id="go-convert-btn" style="margin-top: 10px;">👉 去转换页核对</button>
+<div class="warehouse-selector" id="warehouse-selector"></div>
+    <!-- 👇 緊湊多欄版：昨日庫存置頂卡片 (支援吸頂懸掛特效) -->
+    <div id="yesterday-stock-card" class="card" style="display:none; padding: 0; background: rgba(251, 251, 253, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1.5px solid #d2d2d7; margin-bottom: 12px; overflow: hidden; box-shadow: 0 6px 16px rgba(0,0,0,0.08); position: sticky; top: max(12px, env(safe-area-inset-top)); z-index: 90;">
+      <div style="padding: 6px 14px; border-bottom: 1px solid #e5e5ea; background: #f2f2f7; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: bold; font-size: 13px; color: #1d1d1f; display: flex; align-items: center; gap: 6px;">
+          <span>📋 昨日結存</span>
+          <span id="yesterday-date-tag" style="font-size: 11px; background: #8e8e93; color: white; padding: 1px 6px; border-radius: 5px; font-weight: normal;">-</span>
+        </div>
+        <span id="yesterday-item-count" style="color: #86868b; font-size: 12px;">0 条</span>
+      </div>
+      <!-- 👇 一欄最多 5 行，超過自動往右開新欄 -->
+      <ul id="yesterday-item-list" style="padding: 6px 10px; margin: 0; display: grid; grid-template-rows: repeat(5, auto); grid-auto-flow: column; grid-auto-columns: minmax(265px, max-content); gap: 4px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; align-content: start;"></ul>
     </div>
 
     <div class="card" style="padding: 0;">
-      <div style="padding: 12px 16px; border-bottom: 1px solid #e5e5ea; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between;">
-        <span id="list-title">已点记录</span>
+      <div style="padding: 12px 16px; border-bottom: 1px solid #e5e5ea; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span id="list-title">已点记录</span>
+          <!-- 👇 显示谁在点货 -->
+          <span id="lock-status" style="display:none; color:#ff9500; font-size:12px; margin-left:8px; font-weight:normal;">🔒 被 文 锁定</span>
+        </div>
         <span id="item-count" style="color: #86868b; font-weight: normal; font-size: 14px;">0 条</span>
       </div>
       <ul id="item-list" style="padding: 0 16px;"></ul>
     </div>
+<div class="card">
+    <button class="btn btn-primary btn-block" id="ptt-btn" style="height: 80px; font-size: 20px; border-radius: 16px; touch-action: none; box-shadow: 0 4px 12px rgba(0,122,255,0.3); margin-bottom: 12px;">
+        🎙️ 按住說話
+      </button>
+<button class="btn btn-success btn-block" id="confirm-submit-btn" style="height: 50px; font-size: 18px;">
+        ✅ 确认提交当前仓货件
+    </button>
+</div>
   </div>
 
   <!-- ================= 页面 2：转换页 ================= -->
   <div id="page-convert" class="page">
     <h1>
-      🔄 转换核对
-      <button id="export-csv-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold;">📥 导出 Excel</button>
+      <div>🔄 转换核对</div>
+      <div style="display:flex; align-items:center;">
+        <span class="user-display" style="font-size:15px; color:var(--primary); font-weight:bold; margin-right:12px;"></span>
+        <button id="export-csv-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold;">📥 导出 Excel</button>
+      </div>
     </h1>
     <div class="warehouse-selector" id="convert-warehouse-selector"></div>
     
-    <div class="card">
-      <!-- 拉取按鈕 -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-        <div style="font-size: 14px; color: #555; font-weight: bold;">📝 点货内容（可修改）</div>
-        <button id="pull-data-btn" style="font-size:12px; padding:6px 12px; border-radius:8px; border:none; background:#007aff; color:white; font-weight:bold;">📥 拉取数据</button>
-      </div>
-      
-      <textarea id="convert-textarea" rows="4" placeholder="点击「拉取数据」或从点货页过来..."></textarea>
-      <button class="btn btn-primary btn-block" id="execute-convert-btn">🔄 执行转换</button>
-    </div>
-
+    <!-- 👇 刪除了文字方塊，並把同步按鈕移到表格標題旁邊 👇 -->
     <div class="card" style="padding: 0;">
-      <div style="padding: 12px 16px; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; border-bottom: 1px solid #e5e5ea;">
-        📊 转换结果
-      </div>
+      <div style="padding: 12px 16px; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; border-bottom: 1px solid #e5e5ea; display: flex; justify-content: space-between; align-items: center;">
+        <span>📊 转换结果</span>
+        <div style="display: flex; gap: 8px;">
+          <button id="confirm-wh-convert-btn" style="font-size:12px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold;">✅ 确认点货内容</button>
+          <button id="force-sync-btn" style="font-size:12px; padding:6px 12px; border-radius:8px; border:none; background:#007aff; color:white; font-weight:bold;">🔄 同步資料</button>
+        </div>
+        </div>
       <div id="convert-results" class="table-container" style="border-radius: 0 0 16px 16px; border: none;">
-        <div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>
+        <div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库暂无点货记录</div>
       </div>
     </div>
   </div>
 
   <!-- ================= 页面 3：设置页 ================= -->
   <div id="page-settings" class="page">
-    <h1>⚙️ 记忆数据</h1>
+    <h1>
+      <div>⚙️ 记忆数据</div>
+      <span class="user-display" style="font-size:15px; color:var(--primary); font-weight:bold;"></span>
+    </h1>
     
     <div class="card">
       <h3 style="margin-top: 0; font-size: 16px;">🏷️ 货物名 ↔ ITEM CODE</h3>
@@ -189,6 +244,31 @@
       <h3 style="margin-top: 0; font-size: 16px;">⚖️ 专属倍率记忆</h3>
       <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">系统在转换页自动记录的（品名+单位）专属倍率。</div>
       <ul id="item-rate-list" style="padding: 0; margin-bottom: 12px;"></ul>
+    </div>
+
+    <!-- 🟢 基础 ITEM 資料庫 (云端版) -->
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">📚 基础 ITEM 資料庫</h3>
+      <div style="font-size: 13px; color: #86868b; margin-bottom: 8px;">
+        共 <span id="db-count" style="font-weight:bold; color:var(--primary);">0</span> 条。保存在云端，供所有设备共享。
+      </div>
+      
+      <!-- 批量粘贴区域 -->
+      <textarea id="db-batch-input" rows="4" placeholder="在此粘贴多行 ITEM (每行一个)，点击下方按钮覆盖云端数据..." style="font-family: monospace; font-size: 12px; margin-bottom: 8px;"></textarea>
+      
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="btn btn-primary" id="sync-db-btn" style="flex: 1; font-size: 14px; padding: 10px;">☁️ 覆盖导入云端</button>
+        <button class="btn btn-success" id="fetch-db-btn" style="flex: 1; font-size: 14px; padding: 10px;">📥 刷新云端数据</button>
+      </div>
+
+      <div id="db-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid #e5e5ea; border-radius: 8px; margin-bottom: 12px; padding: 0 12px; background: #fafafa;">
+        <ul id="db-list" style="padding: 0; margin: 0;"></ul>
+      </div>
+
+      <div class="setting-row">
+        <input type="text" id="new-db-item" placeholder="新增單條 ITEM">
+        <button class="add" id="add-db-item-btn">+</button>
+      </div>
     </div>
 
     <!-- 数据备份与恢复 -->
@@ -212,6 +292,58 @@
     </div>
   </div>
 
+    <!-- ================= 页面 5：历史记录 ================= -->
+  <div id="page-history" class="page">
+    <h1>
+      <div>📜 历史记录</div>
+      <div style="display:flex; align-items:center;">
+        <span class="user-display" style="font-size:15px; color:var(--primary); font-weight:bold; margin-right:12px;"></span>
+        <button id="export-history-btn" style="font-size:14px; padding:6px 12px; border-radius:8px; border:none; background:#34c759; color:white; font-weight:bold;">📥 导出当日 Excel</button>
+      </div>
+    </h1>
+
+    <!-- 1. 日期選擇列 (滑動切換) -->
+    <div id="history-date-selector" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 4px; -webkit-overflow-scrolling: touch;"></div>
+
+    <!-- 2. 倉庫選擇按鈕 (與點貨頁一模一樣) -->
+    <div class="warehouse-selector" id="history-warehouse-selector"></div>
+
+    <!-- 3. 貨物列表卡片 (與點貨頁風格一致) -->
+    <div class="card" style="padding: 0;">
+      <div style="padding: 12px 16px; border-bottom: 1px solid #e5e5ea; font-weight: bold; background: #fafafa; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center;">
+        <span id="history-list-title">已点记录</span>
+        <span id="history-item-count" style="color: #86868b; font-weight: normal; font-size: 14px;">0 条</span>
+      </div>
+      <ul id="history-item-list" style="padding: 0 16px;"></ul>
+    </div>
+  </div>
+
+    <!-- ================= 页面 4：人员管理 ================= -->
+  <div id="page-users" class="page">
+    <h1>
+      <div>👥 人员管理</div>
+      <span class="user-display" style="font-size:15px; color:var(--primary); font-weight:bold;"></span>
+    </h1>
+    <div class="card">
+      <ul id="user-list" style="padding: 0;"></ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">➕ 新增 / 修改人员</h3>
+      <div class="setting-row" style="flex-wrap: wrap; gap: 8px;">
+        <input type="text" id="new-user-id" placeholder="工号(如1440)" style="flex: 1; min-width: 45%;">
+        <input type="text" id="new-user-name" placeholder="姓名(陳大文)" style="flex: 1; min-width: 45%;">
+        <input type="text" id="new-user-nick" placeholder="昵称(文)" style="flex: 1; min-width: 45%;">
+        <input type="password" id="new-user-pw" placeholder="密码(非admin留空)" style="flex: 1; min-width: 45%;">
+        <select id="new-user-role" style="flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px;">
+          <option value="worker">工人 (worker)</option>
+          <option value="supervisor">主管 (supervisor)</option>
+          <option value="admin">管理员 (admin)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block" id="save-user-btn" style="margin-top: 8px;">确认保存</button>
+    </div>
+  </div>
+
   <!-- 底部导航 -->
   <div class="bottom-nav">
     <button class="nav-item active" data-target="page-pointing">
@@ -223,9 +355,66 @@
     <button class="nav-item" data-target="page-settings">
       <span class="nav-icon">⚙️</span>设置
     </button>
+    <!-- 👇 新增歷史按鈕 -->
+    <button class="nav-item" data-target="page-history">
+      <span class="nav-icon">📜</span>历史
+    </button>
+    <button class="nav-item" data-target="page-users" style="display: none;">
+      <span class="nav-icon">👥</span>人员
+    </button>
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- ======= 單位選擇彈出層 ======= -->
+  <div id="unit-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 360px;">
+      <div class="modal-title">選擇單位</div>
+      <div class="unit-grid">
+        <button class="unit-btn">箱</button>
+        <button class="unit-btn">隻</button>
+        <button class="unit-btn">KG</button>
+        <button class="unit-btn">盒</button>
+        <button class="unit-btn">支</button>
+        <button class="unit-btn">杯</button>
+      </div>
+      <button class="btn btn-block" id="unit-cancel" style="margin-top: 16px; background: #e5e5ea; color: #1d1d1f;">取消</button>
+    </div>
+  </div>
+
+  <!-- ======= 數字鍵盤彈出層 (3x4 佈局加強版) ======= -->
+  <div id="numpad-modal" class="modal-overlay">
+    <div class="modal-content" style="width: 300px; padding: 16px; background: #f4f4f5; border-radius: 12px; box-sizing: border-box;">
+      <div class="modal-title" style="margin-bottom: 12px; color: #333; font-weight: bold; text-align: center;">輸入數量</div>
+      
+      <!-- 顯示幕 (靠右對齊) -->
+      <div id="numpad-display" style="font-size: 36px; font-weight: 300; padding: 10px 16px; background: white; border: 1px solid #d1d1d6; border-radius: 6px; min-height: 50px; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 12px; word-break: break-all;"></div>
+      
+      <!-- 3x4 數字網格 (👇 直接加入 style 強制 3 等分) -->
+      <div class="numpad-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%;">
+        <button class="numpad-btn">1</button>
+        <button class="numpad-btn">2</button>
+        <button class="numpad-btn">3</button>
+        <button class="numpad-btn">4</button>
+        <button class="numpad-btn">5</button>
+        <button class="numpad-btn">6</button>
+        <button class="numpad-btn">7</button>
+        <button class="numpad-btn">8</button>
+        <button class="numpad-btn">9</button>
+        <button class="numpad-btn">.</button>
+        <button class="numpad-btn">0</button>
+        <button class="numpad-btn action" id="numpad-del">⌫</button>
+      </div>
+
+      <!-- 底部控制按鈕 -->
+      <div style="display: flex; gap: 6px; margin-top: 6px; width: 100%;">
+        <button class="numpad-btn action" id="numpad-clear" style="flex: 1; font-size: 18px;">清除</button>
+        <button class="numpad-btn confirm" id="numpad-confirm" style="flex: 2; font-size: 20px;">確定</button>
+      </div>
+
+      <button class="btn btn-block" id="numpad-cancel" style="margin-top: 12px; background: transparent; color: #86868b; padding: 8px;">取消</button>
+    </div>
+  </div>
 
   <!-- ======= 倉庫管理選單彈出層 ======= -->
   <div id="wh-modal" class="modal-overlay">
@@ -268,335 +457,19 @@
     </div>
   </div>
 
+<!-- ======= 登入彈出層 ======= -->
+  <div id="login-modal" class="modal-overlay active" style="z-index: 9999; background: var(--bg);">
+    <div class="modal-content">
+      <div class="modal-title">🔐 点货系统登录</div>
+      <input type="text" id="login-username" class="modal-input" placeholder="帐号 (admin 或 worker)">
+      <input type="password" id="login-password" class="modal-input" placeholder="密码">
+      <button class="btn btn-primary btn-block" id="login-btn" style="margin-top: 12px;">登录</button>
+    </div>
+  </div>
+
   <script>
   (function() {
     'use strict';
-
-    const RAW_ITEMS = `A&W-FOAPJ-btl
-A&W-FOGFJ-btl
-A&W-FOORJ-btl
-A&W-FOPAJ-btl
-A&W-FOTMJ-btl
-A&W-OSCCJ-btl
-A&W-RLMJC-btl
-AE-kg
-AFFCR-pkt
-AGL-kg
-ALIME-pc
-ALS-pkt
-APG(CH)-pc
-APG-pc
-API-pc
-APR-pc
-ASP-kg
-AU-BBR-bdl
-AU-CP-kg
-AU-KP-kg
-AU-TMCOV-kg
-AV-pc
-BA-kg
-BAMBSH-kg
-BBC-pc
-BBEPW-kg
-BBG-kg
-BB-pkt
-BBR200g-pkt
-BBR-CH-kg
-BBS-kg
-BBSPH-kg
-BBSRS-kg
-BC(Fire)-kg
-BC-pc
-BCSM-kg
-BE-kg
-BER-kg
-BF-kg
-BFP-kg
-BG-kg
-BK-kg
-BL-kg
-BMST-kg
-BMV-kg
-BNA-kg
-BPK-kg
-B-pkt
-BRC-US-kg
-BR-kg
-BRP-kg
-BRS-kg
-BR-US-kg
-BSH-pkt
-BS-kg
-BSL-kg
-BSS-kg
-BY-kg
-CA-kg
-CBB-kg
-CBBPUR-kg
-CCB-kg
-CCBT-kg
-CCS-kg
-CER-kg
-CFC-kg
-CF-kg
-C-kg
-CLC-kg
-CLE-kg
-CL-kg
-CM-kg
-CNMUS-kg
-CNMUS-pkt
-CNVP-pkt
-COPGR-pkt
-CORG-kg
-CORN-pc
-CORNUP-pc
-CP-kg
-CRABRY340g-pkt
-CRD-kg
-CR-kg
-CS-kg
-CSM-kg
-CST-kg
-CUS-kg
-CV-kg
-CWCH-pc
-CW-kg
-CY(J)-cs
-DC-kg
-DCS-kg
-DE-pc
-DF-pc
-DILL-kg
-DPNA-kg
-E(HB)-pcs
-E(JP)-pkt
-E(Malaysia)-pc
-E(U.S.A)L-pc
-E(U.S.A)S-pc
-ECGPJ2L(AUS)-btl
-ECGUJ2L(AUS)-btl
-ECLIMJ2L(AUS)-btl
-ECLMJ2L(AUS)-btl
-ECORGJ2L(AUS)-btl
-EDFLOW-pkt
-EDFLW-CHRY-pkt
-EDFLW-HYDGRE(25pcs)-pkt
-EDFLW-HYDPIN(25pcs)-pkt
-EDFLW-HYDPU(25pcs)-pkt
-EDFLW-pkt
-EM-pkt
-E-pc
-EP-kg
-FBA-kg
-FB-case
-FBC-pkt
-FC-pkt
-FERNLV-pkt
-F-kg
-FM946ml-pc
-FMD-kg
-FMV-pkt
-FNL-kg
-FSTCHU(20pc)-bag
-GAS-kg
-GC-kg
-GCS-kg
-GI-kg
-GLG-kg
-GLRS-kg
-GM-kg
-G-pc
-GPD-kg
-GP-kg
-GPS-kg
-GRR-kg
-GVB-pkt
-HBC-pkt
-HBP-kg
-HDM-kg
-HM-kg
-H-pkt
-HR-kg
-IL-kg
-JALPEP-kg
-JO-kg
-JPGCWOS-kg
-JPG-kg
-JP-kg
-KALE-L-kg
-KC-kg
-KF-pc
-K-kg
-LB-kg
-LG-kg
-LIME-pc
-LITGEM-pkt
-LK-kg
-LM-pc
-LRHC-kg
-LRH-kg
-LR-kg
-LRS-kg
-LTR-kg
-LUS-kg
-MB-kg
-MCL-kg
-MELG-kg
-MGGB(B)-pkt
-MGGB(S)-pkt
-MGNAR-pc
-MG-pc
-MGPS-pkt
-MGY-kg
-MHV-kg
-MINPKN-pc
-MIXP-pkt
-M-kg
-MLC-pkt
-MM-kg
-MML-kg
-MMLP-kg
-MN-pc
-M-pkt
-MPL-kg
-MPRT-kg
-MPRT-pkt
-MSW-pkt
-MUCOM-pkt
-MUSMA-pkt
-MUSSEA-pkt
-MW-kg
-NANTZ-pkt
-OG-kg
-OK-kg
-OL-kg
-OM-kg
-OMS-kg
-ON-kg
-ONP-kg
-ORG-pc
-ORGV-pkt
-OR-kg
-ORP-kg
-OSP-kg
-OSPU-kg
-OYM-kg
-PA-pc
-PC-kg
-PCW-kg
-PEA-pkt
-PF-kg
-PG-kg
-PGOL-kg
-PI-kg
-P-kg
-PKN-kg
-PKP-kg
-PLB-kg
-PLRS-kg
-PM-pc
-PN-kg
-POL-kg
-PON-kg
-PPAG-kg
-PPA-kg
-PP-kg
-PR-kg
-PRLB-kg
-PR-pc
-PRS-kg
-PSM3-kg
-PS-pkt
-PSPO-kg
-PTE-pc
-PTOL-kg
-PUS-kg
-PUSP-kg
-PY-kg
-PYT-pc
-QE-pc
-RC-pkt
-RCS-kg
-RCSNS-kg
-RCY-kg
-RLC-kg
-RL-kg
-RM-kg
-RMTM-kg
-RR-kg
-RSPO-kg
-RSP-pkt
-SAC(CH)-kg
-SAC-kg
-SBC-pkt
-SCP-kg
-SE-pc
-SGG-kg
-SG-kg
-SGR-kg
-SHBNA-kg
-SH-kg
-SHP-kg
-SK-kg
-SL-pc
-SM-kg
-SPH-kg
-SPO-kg
-SPOP-kg
-SPP-kg
-SRS-pkt
-SSF-kg
-ST-454gm-pkt
-ST-pkt
-SUG&CIN(3kg)-bag
-SWE-kg
-TASPC(T)-pkt
-TASP-pkt
-TBSL-kg
-TE-kg
-TE-pc
-TG-kg
-TH-kg
-TMCI-pkt
-TMC-kg
-TMCMX-pkt
-TMCNS-kg
-TMCOV(AUS)-pkt
-TMCOV(HL)300g-pkt
-TMCY-pkt
-TM-kg
-TMM-kg
-TR-kg
-TUS-kg
-TW-kg
-TWP-kg
-TYG-kg
-WASP-kg
-WM-kg
-WMR-kg
-WWC-pkt
-YAM-kg
-YC-cs
-ZG-kg
-ZY-kg
-PPAGP-kg
-SKP-kg
-WCP-kg
-FFHB-kg
-BCDY-pc
-FF(TH)5lb-pkt
-CJ-kg
-PGD1cm-kg
-PRD1cm-kg
-PYD1CM-kg
-PGD2.5cm-kg
-PRD2.5cm-kg
-PYD2.5cm-kg
-TMD1cm-kg`;
-
-    const ALL_ITEMS = [...new Set(RAW_ITEMS.split('\n').map(s => s.trim()).filter(s => s))];
-    const ORIGINAL_ITEMS_SET = new Set(ALL_ITEMS.map(i => i.toUpperCase()));
 
     const STORAGE_KEY = 'dianhuo_data_v8'; 
     let warehouses = ['A仓', 'B仓', 'C仓'];
@@ -604,13 +477,127 @@ TMD1cm-kg`;
     let items = []; 
     let itemCodes = {}; 
     let itemRates = {}; 
-    let convertState = {}; 
-    let currentExcelData = []; 
+    let convertState = {};
+    let lockedWarehouses = {}; 
+    let confirmedWarehouses = {}; // 👈 新增：記錄每個倉庫是否已確認
+    let currentExcelData = [];
+
+    let isProcessingAudio = false; // 防止连续录音
+    let isPressing = false;        // 记录手指是否按在按钮上
+    
+    // 基礎 ITEM 庫 (來自雲端)
+    let allItems = []; 
+    let originalItemsSet = new Set();
 
     const $ = id => document.getElementById(id);
     const toastEl = $('toast');
 
-    // ----- 輸入框彈窗邏輯 -----
+    const API_URL = 'http://47.243.73.16:3001/api';
+    let currentUser = null;
+    let activeLocks = {};
+
+    // ================= 登入 =================
+    $('login-btn').addEventListener('click', async () => {
+      const username = $('login-username').value.trim();
+      const password = $('login-password').value.trim();
+      if (!username) { showToast('请输入帐号'); return; }
+
+      const btn = $('login-btn');
+      btn.disabled = true;
+      btn.textContent = '登录中...';
+
+      let res;
+      try {
+        res = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '登录';
+        showToast('❌ 无法连接服务器，请检查网络或服务器是否已启动');
+        return;
+      }
+
+      // 👇 把原来判断 !res.ok 的地方改掉，直接去解析数据
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '登录';
+        showToast('❌ 服务器返回异常，请检查后端服务状态');
+        return;
+      }
+
+      btn.disabled = false; btn.textContent = '登录';
+
+      if (data.success) {
+        currentUser = data;
+        $('login-modal').classList.remove('active');
+        showToast(`✅ 登录成功：${currentUser.nickname}`); // 移除了身分提示
+        
+        // 👇 更新：只顯示名字，並在旁邊加入紅色的「登出」按鈕
+        document.querySelectorAll('.user-display').forEach(el => {
+          el.innerHTML = `
+            👤 ${escapeHtml(currentUser.nickname)} 
+            <button class="logout-btn" style="margin-left: 8px; font-size: 13px; padding: 4px 10px; border-radius: 8px; border: 1.5px solid #ff3b30; background: #fff1f0; color: #ff3b30; font-weight: bold; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">登出</button>
+          `;
+        });
+        
+        // 👇 綁定所有登出按鈕的點擊事件
+        document.querySelectorAll('.logout-btn').forEach(btn => {
+          btn.onclick = () => {
+            if (confirm('确定要退出登录吗？')) {
+              currentUser = null;
+              $('login-password').value = ''; // 清空密碼框
+              $('login-modal').classList.add('active'); // 重新彈出登入畫面
+            }
+          };
+        });
+        
+        fetchBaseItems();
+        fetchMemories();
+        fetchLocks(); 
+        fetchHistory(); // 👈 登入成功時預先讀取歷史
+        autoSyncCloudData();
+
+        if (currentUser.role === 'worker') {
+          document.querySelector('.nav-item[data-target="page-convert"]').style.display = 'none';
+          document.querySelector('.nav-item[data-target="page-settings"]').style.display = 'none';
+          document.querySelector('.nav-item[data-target="page-users"]').style.display = 'none';
+          document.querySelector('.nav-item[data-target="page-history"]').style.display = 'none'; // 👈 新增這行隱藏歷史頁
+          if ($('force-sync-btn')) $('force-sync-btn').style.display = 'none';
+          if ($('manage-wh-btn')) $('manage-wh-btn').style.display = 'none';
+          if ($('add-manual-item-btn')) $('add-manual-item-btn').style.display = 'none';
+        } else if (currentUser.role === 'supervisor') {
+          document.querySelector('.nav-item[data-target="page-users"]').style.display = 'none'; 
+          if ($('manage-wh-btn')) $('manage-wh-btn').style.display = 'none'; 
+        } else if (currentUser.role === 'admin') {
+          document.querySelector('.nav-item[data-target="page-users"]').style.display = 'flex'; 
+          if ($('add-manual-item-btn')) $('add-manual-item-btn').style.display = 'inline-block';
+          if ($('unlock-wh-btn')) $('unlock-wh-btn').style.display = 'inline-block';
+        }
+      } else {
+        // 👇 这里就会正确显示后端传来的“账号或密码错误”了！
+        showToast('❌ ' + (data.message || '帐号或密码错误'));
+      }
+    });
+
+    // ================= 核心邏輯 =================
+
+    async function uploadToCloud(itemName, warehouseName) {
+      try {
+        await fetch(`${API_URL}/items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [{ name: itemName, warehouse: warehouseName }] })
+        });
+      } catch (e) {
+        showToast('⚠️ 已存本地，但云端同步失败，请检查网络');
+        console.error('云端同步失败');
+      }
+    }
+
     let inputCallback = null;
     function showInputModal(title, defaultValue, callback) {
       $('input-title').textContent = title;
@@ -633,21 +620,6 @@ TMD1cm-kg`;
       if (e.key === 'Enter') $('input-confirm').click();
     });
 
-    // ----- 核心邏輯 -----
-    function cnToNum(cn) {
-      if (!cn) return 0;
-      if (!isNaN(cn)) return parseFloat(cn);
-      const cnNums = { '零':0, '一':1, '二':2, '两':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10 };
-      if (cn === '十') return 10;
-      if (cn.includes('十')) {
-        const parts = cn.split('十');
-        const tens = parts[0] ? cnNums[parts[0]] : 1;
-        const ones = parts[1] ? cnNums[parts[1]] : 0;
-        return tens * 10 + ones;
-      }
-      return cnNums[cn] || 0;
-    }
-
     let toastTimer;
     function showToast(msg) {
       toastEl.textContent = msg;
@@ -658,11 +630,40 @@ TMD1cm-kg`;
 
     function save() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ warehouses, currentWarehouse, items, itemCodes, itemRates, convertState }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+          warehouses, 
+          currentWarehouse, 
+          items, 
+          itemCodes, 
+          itemRates, 
+          convertState,
+          lockedWarehouses,
+          confirmedWarehouses // 👈 新增這行
+        }));
       } catch(e){
         showToast('存储空间不足，请去设置清理数据');
       }
     }
+
+    // 👇👇👇 就加在这个空行，load 函数的上面 👇👇👇
+    let syncTimer = null;
+    function syncToCloud() {
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(async () => {
+        try {
+          await fetch(`${API_URL}/memories/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemCodes, itemRates, warehouses })
+          });
+          console.log('✅ 记忆数据已同步云端');
+        } catch (e) {
+          console.error('云端同步失败', e);
+        }
+      }, 1000); // 停止输入 1 秒后才发请求，防止卡顿
+    }
+    // 👆👆👆 --------------------------------- 👆👆👆
+    
     function load() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -674,6 +675,8 @@ TMD1cm-kg`;
         if (d.itemCodes) itemCodes = d.itemCodes;
         if (d.itemRates) itemRates = d.itemRates;
         if (d.convertState) convertState = d.convertState;
+        if (d.lockedWarehouses) lockedWarehouses = d.lockedWarehouses; 
+        if (d.confirmedWarehouses) confirmedWarehouses = d.confirmedWarehouses; // 👈 新增這行
         
         if (!warehouses.includes(currentWarehouse)) {
           currentWarehouse = warehouses[0];
@@ -682,55 +685,132 @@ TMD1cm-kg`;
     }
 
     function escapeHtml(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
+      return String(s || '').replace(/[&<>"']/g, c => ({ 
+        '&': '&amp;', 
+        '<': '&lt;', 
+        '>': '&gt;', 
+        '"': '&quot;', 
+        "'": '&#39;' 
+      }[c]));
     }
 
-    function updateConvertTextareaFromItems(isManualPull = false) {
-      const filtered = items.filter(it => it.warehouse === currentWarehouse);
-      const text = filtered.map(it => it.name).join('\n');
-      
-      $('convert-textarea').value = text;
-      convertState[currentWarehouse] = text;
-      save();
-
-      if (isManualPull) {
-        if (text.trim()) {
-          executeParse();
-        } else {
-          $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库没有点货记录</div>';
+    // 🟢 從雲端拉取基礎 ITEM
+    async function fetchBaseItems() {
+      try {
+        const res = await fetch(`${API_URL}/base-items`);
+        const data = await res.json();
+        if (data.success && data.items) {
+          allItems = data.items;
+          originalItemsSet = new Set(allItems.map(i => i.toUpperCase()));
+          renderSettings(); // 更新 UI
         }
-        showToast(filtered.length > 0 ? `✅ 已拉取 ${filtered.length} 条记录` : '当前仓库没有记录，已清空');
+      } catch (e) {
+        console.error('拉取基础 ITEM 失败', e);
       }
     }
 
+    async function fetchMemories() {
+      try {
+        const res = await fetch(`${API_URL}/memories`);
+        const data = await res.json();
+        if (data.success) {
+          itemCodes = data.itemCodes || {};
+          itemRates = data.itemRates || {};
+          
+          // 👇 关键点 2：必须加上这段，把云端的仓库覆盖到本地，并重新渲染！
+          if (data.warehouses && data.warehouses.length > 0) {
+            warehouses = data.warehouses;
+            sortWarehouses();
+            if (!warehouses.includes(currentWarehouse)) {
+              currentWarehouse = warehouses[0];
+            }
+          }
+
+          save(); 
+          renderAll(); // 👈 这步很关键，必须要有，才会重新画仓库按钮
+          
+          if ($('page-convert').classList.contains('active')) {
+             executeParse(); 
+          }
+        }
+      } catch (e) {
+        console.error('拉取云端记忆失败', e);
+      }
+    }
+    
+    async function fetchLocks() {
+      try {
+        const res = await fetch(`${API_URL}/locks?_t=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success) {
+          activeLocks = {};
+          data.locks.forEach(l => activeLocks[l.warehouse] = l.lockedBy);
+          renderAll(); 
+        }
+      } catch (e) { console.error(e); }
+    }
+    // 启动时定时拉取锁定状态
+    setInterval(fetchLocks, 3000);
+
+    async function lockWarehouse(warehouse, nickname) {
+      await fetch(`${API_URL}/locks`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warehouse, lockedBy: nickname })
+      });
+      activeLocks[warehouse] = nickname;
+      renderAll();
+    }
+
+    async function unlockWarehouse(warehouse) {
+      await fetch(`${API_URL}/locks/${encodeURIComponent(warehouse)}`, { method: 'DELETE' });
+      delete activeLocks[warehouse];
+      renderAll();
+    }
+ 
+    // 👇 新增：按 A-Z 和 数字自然排序
+    function sortWarehouses() {
+      warehouses.sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }));
+    }
+
     function renderWarehouses() {
+      sortWarehouses();
       const render = (containerId) => {
         const ws = $(containerId);
         ws.innerHTML = '';
         warehouses.forEach(wh => {
           const btn = document.createElement('button');
+          const isLocked = activeLocks[wh] && activeLocks[wh] !== currentUser?.nickname;
+          
           btn.className = 'wh-btn' + (wh === currentWarehouse ? ' active' : '');
-          btn.textContent = wh;
+          btn.textContent = wh + (activeLocks[wh] ? ` (${activeLocks[wh]})` : '');
+          
+          if (isLocked) {
+            btn.style.opacity = '0.5';
+            btn.style.border = '2px dashed #ff3b30';
+            btn.textContent += ' 🔒';
+          }
+
           btn.onclick = () => { 
             if (currentWarehouse === wh) return; 
+            
+            // 👇 修改这里：只拦截“正在点货”，不拦截“已完成”
+            if (isLocked && containerId === 'warehouse-selector') {
+              const lockStatus = activeLocks[wh] || '';
+              const isCompleted = lockStatus.includes('(已完成)');
+
+              // 如果仓库正在被别人点货，且还没点完，普通工人不能进去捣乱
+              if (currentUser.role === 'worker' && !isCompleted) {
+                showToast(`⚠️ 该仓库正被 ${lockStatus} 点货中，请稍后再试`);
+                return;
+              }
+              // 如果是“已完成”状态，工人可以点进去看，继续往下走
+            }
+            
             currentWarehouse = wh; 
             renderAll(); 
             
             if ($('page-convert').classList.contains('active')) {
-              const cachedText = convertState[currentWarehouse];
-              if (cachedText !== undefined) {
-                $('convert-textarea').value = cachedText;
-                if (cachedText.trim()) {
-                  executeParse();
-                } else {
-                  $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
-                }
-              } else {
-                $('convert-textarea').value = '';
-                $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
-              }
+              executeParse(); // 切換倉庫時直接重繪表格
             }
           };
           ws.appendChild(btn);
@@ -740,21 +820,225 @@ TMD1cm-kg`;
       render('convert-warehouse-selector');
     }
 
+    // ======= 渲染昨日庫存邏輯（緊湊多欄版：一欄最多 5 行） =======
+    function renderYesterdayStock() {
+      const card = $('yesterday-stock-card');
+      const listUl = $('yesterday-item-list');
+      const dateTag = $('yesterday-date-tag');
+      const countTag = $('yesterday-item-count');
+      if (!card || !listUl) return;
+
+      // 1. 只有在「已開始點貨（倉庫已鎖定）」時才顯示
+      const lockStatus = activeLocks[currentWarehouse] || '';
+      if (!lockStatus) {
+        card.style.display = 'none';
+        return;
+      }
+
+      // 2. 從歷史紀錄取最近一天的結存
+      if (!historyRecords || historyRecords.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+
+      const yesterdayData = historyRecords[0];
+
+      // 取得今日當前倉庫已經點過的貨物名稱
+      const todayItemNames = new Set(
+        items.filter(it => it.warehouse === currentWarehouse).map(it => it.name)
+      );
+
+      // 過濾出尚未盤點的昨日貨物
+      const remainingYesterdayItems = (yesterdayData.items || []).filter(it => {
+        const wh = it.warehouse || '未歸類';
+        return wh === currentWarehouse && !todayItemNames.has(it.name);
+      });
+
+      card.style.display = 'block';
+      dateTag.textContent = yesterdayData.dateStr || '昨日';
+      countTag.textContent = `待點 ${remainingYesterdayItems.length} 條`;
+
+      if (remainingYesterdayItems.length === 0) {
+        listUl.innerHTML = '<li style="grid-column: 1 / -1; justify-content:center; color:#34c759; font-size:12px; padding: 6px 0; font-weight:bold; background:none; border:none;">🎉 昨日結存貨品已全部點齊！</li>';
+        return;
+      }
+
+      const isCompleted = lockStatus.includes('(已完成)');
+      const isLockedByOther = lockStatus && lockStatus !== currentUser?.nickname && !lockStatus.startsWith(currentUser?.nickname + ' ');
+      const isAdminOrSup = currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor');
+      const canOperate = !isLockedByOther || (isCompleted && isAdminOrSup);
+
+      listUl.innerHTML = '';
+      remainingYesterdayItems.forEach((it, idx) => {
+        const li = document.createElement('li');
+        // 緊湊膠囊單元格樣式
+        li.style.padding = '4px 8px';
+        li.style.margin = '0';
+        li.style.background = '#ffffff';
+        li.style.border = '1px solid #e5e5ea';
+        li.style.borderRadius = '6px';
+        li.style.display = 'flex';
+        li.style.alignItems = 'center';
+        li.style.justifyContent = 'space-between';
+        li.style.boxShadow = '0 1px 2px rgba(0,0,0,0.02)';
+        li.style.cursor = canOperate ? 'pointer' : 'default';
+        li.style.transition = 'background-color 0.15s, border-color 0.15s';
+
+        if (canOperate) {
+          li.onmouseenter = () => { li.style.backgroundColor = '#eef7ff'; li.style.borderColor = '#90caf9'; };
+          li.onmouseleave = () => { li.style.backgroundColor = '#ffffff'; li.style.borderColor = '#e5e5ea'; };
+        }
+
+        li.innerHTML = `
+          <!-- 左側：序號、完整品名與加號 -->
+          <div style="display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; margin-right: 8px;">
+            <span style="background: #e5e5ea; color: #636366; font-size: 11px; padding: 1px 5px; border-radius: 4px; font-weight: bold; min-width: 20px; text-align: center;">${idx + 1}</span>
+            <span style="font-size: 15px; color: #1d1d1f; font-weight: bold; white-space: nowrap;">${escapeHtml(it.name)}</span>
+            <span style="font-size: 11px; color: #007aff; background: #e3f2fd; border: 1px solid #90caf9; padding: 1px 5px; border-radius: 4px; font-weight: bold; line-height: 15px;">➕</span>
+          </div>
+          
+          <!-- 右側：數量與單位整合為單一膠囊標籤，永不換行也不會被裁切 -->
+          <div style="flex-shrink: 0; white-space: nowrap;">
+            <span style="padding: 2px 8px; background: #f2f2f7; border: 1px solid #e5e5ea; border-radius: 6px; color: #1d1d1f; font-size: 13px; font-weight: bold;">
+              ${escapeHtml(String(it.qty ?? '-'))} <span style="font-weight: normal; color: #636366; font-size: 12px;">${escapeHtml(it.unit || '')}</span>
+            </span>
+          </div>
+        `;
+
+        li.onclick = () => {
+          if (!canOperate) {
+            showToast('⚠️ 只讀模式，無法操作');
+            return;
+          }
+
+          const newItem = {
+            name: it.name,
+            qty: '',
+            unit: it.unit || '',
+            warehouse: currentWarehouse,
+            synced: false,
+            operator: currentUser?.nickname || '',
+            localId: Date.now() + '_' + Math.random().toString(36).substr(2, 5)
+          };
+
+          items.push(newItem);
+          save();
+          renderItems();
+          renderYesterdayStock();
+
+          activeItemForModal = newItem;
+          pendingYesterdayItem = newItem; // 👈 新增：標記此項目剛從昨日結存新增
+          numpadBuffer = '';
+          $('numpad-display').textContent = '0';
+          $('numpad-modal').classList.add('active');
+
+          setTimeout(() => {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          }, 100);
+        };
+
+        listUl.appendChild(li);
+      });
+    }
+
     function renderItems() {
       $('list-title').textContent = currentWarehouse + ' · 已点记录';
       const filtered = items.filter(it => it.warehouse === currentWarehouse);
       $('item-count').textContent = filtered.length + ' 条';
+
+      // 👇 锁定状态判断
+      const isLockedByOther = activeLocks[currentWarehouse] && activeLocks[currentWarehouse] !== currentUser?.nickname;
+      const lockStatusEl = $('lock-status');
+      if (activeLocks[currentWarehouse]) {
+        lockStatusEl.style.display = 'inline-block';
+        lockStatusEl.textContent = `🔒 被 ${activeLocks[currentWarehouse]} 锁定中`;
+        lockStatusEl.style.color = isLockedByOther ? '#ff3b30' : '#ff9500';
+      } else {
+        lockStatusEl.style.display = 'none';
+      }
 
       const ul = $('item-list');
       ul.innerHTML = '';
       if (filtered.length === 0) {
         ul.innerHTML = '<li style="justify-content:center; color:#86868b; padding: 20px 0;">暂无记录</li>';
       } else {
-        filtered.forEach((it) => {
+        // 如果有未提交的数据，也算锁定
+        const hasPending = filtered.some(it => it.synced === false);
+        
+        filtered.forEach((it, index) => {
           const li = document.createElement('li');
+          const syncBadge = it.synced === false 
+            ? '<span style="color:#ff3b30; font-size:12px; margin-left:8px; border:1px solid #ff3b30; padding:2px 6px; border-radius:4px;">未提交</span>' 
+            : '<span style="color:#34c759; font-size:12px; margin-left:8px;">☁️</span>';
+          
+          const isAdmin = currentUser && currentUser.role === 'admin';
+          const isSupervisor = currentUser && currentUser.role === 'supervisor';
+          const lockStatus = activeLocks[currentWarehouse] || '';
+          
+          // 如果狀態是“正在點貨”，且鎖是別人的，就不允許編輯
+          const isPointingNow = lockStatus && !lockStatus.includes('(已完成)') && lockStatus !== currentUser?.nickname;
+          
+          const isSynced = it.synced !== false;
+
+          // 1. 修改權限 (✏️)
+          const canEdit = (isAdmin || isSupervisor) && !isPointingNow;
+          
+          // 2. 刪除權限 (✕)
+          let workerCanDelete = false;
+          let adminCanDelete = false;
+          
+          if (currentUser?.role === 'worker' && !isSynced) {
+            workerCanDelete = true; 
+          } else if ((isAdmin || isSupervisor) && !isPointingNow) {
+            adminCanDelete = true; 
+          }
+
+          // 👇 這裡只產生「一次」修改與刪除按鈕
+          let actionHtml = '';
+          if (canEdit) {
+            actionHtml += `<button class="edit-btn" data-index="${items.indexOf(it)}" style="background:none; border:none; color:#007aff; font-size:16px; padding:8px; cursor:pointer;">✏️</button>`;
+          }
+          if (adminCanDelete) {
+            actionHtml += `<button class="delete-btn" data-index="${items.indexOf(it)}" style="background:none; border:none; color:#ff3b30; font-size:16px; padding:8px; cursor:pointer;">✕</button>`;
+          }
+          
+          const opText = it.operator ? `<span style="color:#86868b; font-size:12px; margin-left:8px;">[${escapeHtml(it.operator)}]</span>` : '';
+
+          const workerDeleteHtml = workerCanDelete ? `<button class="delete-btn" data-index="${items.indexOf(it)}" style="background:none; border:none; color:#ff3b30; padding: 2px 6px; margin-left: 4px; font-size: 16px; cursor:pointer;">✕</button>` : '';
+
+          const canEditInput = !isSynced || canEdit;
+
+          // 👇 排版組合
           li.innerHTML = `
-            <span style="flex:1; word-break:break-all;">${escapeHtml(it.name)}</span>
-            <button class="delete-btn" data-index="${items.indexOf(it)}">✕</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 8px; padding: 4px 0;">
+              
+              <!-- 左側：序號、品名與標籤 -->
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; flex: 1;">
+                <span style="background: #e5e5ea; color: #86868b; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 8px; margin-right: 4px; min-width: 24px; text-align: center;">
+                  ${index + 1}
+                </span>
+                <span style="font-weight: bold; font-size: 16px; word-break: break-all;">
+                  ${escapeHtml(it.name)}
+                </span>
+                ${syncBadge} ${opText} ${workerDeleteHtml}
+              </div>
+              
+              <!-- 右側：數量與單位按鈕 -->
+              <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
+                <div class="item-qty-btn ${!it.qty ? 'empty' : ''} ${!canEditInput ? 'disabled' : ''}" data-index="${items.indexOf(it)}" 
+                     style="padding: 8px 12px; background: ${it.qty !== '' && it.qty != null ? '#e3f2fd' : '#f5f5f7'}; border: 1px solid ${it.qty !== '' && it.qty != null ? '#90caf9' : '#d1d1d6'}; border-radius: 8px; color: ${it.qty !== '' && it.qty != null ? '#1976d2' : '#86868b'}; font-size: 14px; font-weight: bold; min-width: 60px; text-align: center; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                  ${it.qty !== '' && it.qty != null ? it.qty : '填數量'}
+                </div>
+                
+                <div class="item-unit-btn ${!it.unit ? 'empty' : ''} ${!canEditInput ? 'disabled' : ''}" data-index="${items.indexOf(it)}" 
+                     style="padding: 8px 12px; background: ${it.unit ? '#e3f2fd' : '#f5f5f7'}; border: 1px solid ${it.unit ? '#90caf9' : '#d1d1d6'}; border-radius: 8px; color: ${it.unit ? '#1976d2' : '#86868b'}; font-size: 14px; font-weight: bold; min-width: 60px; text-align: center; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                  ${it.unit ? it.unit : '選單位'}
+                </div>
+                
+                <div style="margin-left: 4px; display: flex; align-items: center;">${actionHtml}</div>
+              </div>
+              
+            </div>
           `;
           ul.appendChild(li);
         });
@@ -777,7 +1061,7 @@ TMD1cm-kg`;
           ulIC.appendChild(li);
         });
       }
-
+   
       const ulIR = $('item-rate-list');
       ulIR.innerHTML = '';
       const irKeys = Object.keys(itemRates);
@@ -793,65 +1077,572 @@ TMD1cm-kg`;
           ulIR.appendChild(li);
         });
       }
+      
+      // 🟢 渲染基礎 ITEM 資料庫
+      $('db-count').textContent = allItems.length;
+      const ulDB = $('db-list');
+      ulDB.innerHTML = '';
+      if (allItems.length === 0) {
+        ulDB.innerHTML = '<li style="justify-content:center; color:#86868b; padding:10px 0;">暫無數據，請從雲端刷新</li>';
+      } else {
+        allItems.forEach(item => {
+          const li = document.createElement('li');
+          li.style.padding = '8px 0'; // 讓列表稍微緊湊一點
+          li.innerHTML = `
+            <span style="font-size: 14px; color: #333;">${escapeHtml(item)}</span>
+            <button class="delete-btn" onclick="deleteDBItem('${escapeHtml(item)}')">✕</button>
+          `;
+          ulDB.appendChild(li);
+        });
+      }
+    }
+    // 👇 新增：根据锁定状态与「是否有未提交資料」更新点货页的按钮
+    function updatePointingUI() {
+      const pttBtn = $('ptt-btn');
+      const submitBtn = $('confirm-submit-btn');
+      
+      const lockStatus = activeLocks[currentWarehouse] || '';
+      const isCompleted = lockStatus.includes('(已完成)');
+      
+      const isLockedByOther = lockStatus && lockStatus !== currentUser?.nickname && !lockStatus.startsWith(currentUser?.nickname + ' ');
+      const isAdminOrSup = currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor');
+
+      // 🔍 核心新增：檢查當前倉庫是否有「未提交」的資料
+      const hasUnsubmitted = items.some(it => it.warehouse === currentWarehouse && it.synced === false);
+
+      if (lockStatus) {
+        if (isCompleted) {
+          if (isAdminOrSup) {
+            // 主管/管理員在已完成狀態下，解鎖按鈕以補充數據
+            pttBtn.disabled = false;
+            pttBtn.style.pointerEvents = 'auto'; // 恢復觸摸
+            pttBtn.style.background = 'var(--primary)';
+            pttBtn.style.color = 'white';
+            pttBtn.style.boxShadow = '0 4px 12px rgba(0,122,255,0.3)';
+            pttBtn.innerText = '🎙️ 补充录音 (主管/管理模式)';
+            
+            submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = 'auto'; // 恢復觸摸
+            // 👇 變紅色的提醒邏輯
+            submitBtn.style.background = hasUnsubmitted ? 'var(--danger)' : 'var(--success)';
+            submitBtn.style.color = 'white';
+            submitBtn.innerText = hasUnsubmitted ? '⚠️ 提交修改 / 补充数据' : '✅ 提交补充数据';
+          } else {
+            // 工人看已完成的倉庫只能唯讀
+            pttBtn.disabled = true;
+            pttBtn.style.pointerEvents = 'none'; // 👈 新增這行：徹底禁止平板觸摸
+            pttBtn.style.background = '#e5e5ea';
+            pttBtn.style.color = '#86868b';
+            pttBtn.style.boxShadow = 'none';
+            pttBtn.innerText = `🔒 ${lockStatus.split(' ')[0]} 已点完`;
+            
+            submitBtn.disabled = true;
+            submitBtn.style.pointerEvents = 'none'; // 👈 新增這行
+            submitBtn.style.background = '#e5e5ea';
+            submitBtn.style.color = '#86868b';
+            submitBtn.innerText = '该仓已完成点货';
+          }
+        } else if (isLockedByOther) {
+          // 2. 如果是别人正在点货，就只读
+          pttBtn.disabled = true;
+          pttBtn.style.background = '#e5e5ea';
+          pttBtn.style.color = '#86868b';
+          pttBtn.style.boxShadow = 'none';
+          pttBtn.innerText = `🔒 ${lockStatus} 正在点货...`;
+          
+          submitBtn.disabled = true;
+          submitBtn.style.background = '#e5e5ea';
+          submitBtn.style.color = '#86868b';
+          submitBtn.innerText = '只读模式，无法提交';
+        } else {
+          // 3. 如果是自己正在点货，恢复按钮！
+          pttBtn.disabled = false;
+          pttBtn.style.pointerEvents = 'auto'; // 恢復觸摸
+          pttBtn.style.background = 'var(--primary)';
+          pttBtn.style.color = 'white';
+          pttBtn.style.boxShadow = '0 4px 12px rgba(0,122,255,0.3)';
+          pttBtn.innerText = '🎙️ 按住說話';
+
+          submitBtn.disabled = false;
+          submitBtn.style.pointerEvents = 'auto'; // 恢復觸摸
+          // 👇 變紅色的提醒邏輯
+          submitBtn.style.background = hasUnsubmitted ? 'var(--danger)' : 'var(--success)';
+          submitBtn.style.color = 'white';
+          submitBtn.innerText = hasUnsubmitted ? '⚠️ 有未提交的数据，请确认提交' : '✅ 确认提交当前仓货件';
+        }
+      } else {
+        // 没有锁，处于未开始状态
+        pttBtn.disabled = true;
+        pttBtn.style.pointerEvents = 'none'; // 👈 新增這行：沒按開始前，平板無法觸摸錄音鍵
+        pttBtn.style.background = '#e5e5ea';
+        pttBtn.style.color = '#86868b';
+        pttBtn.style.boxShadow = 'none';
+        pttBtn.innerText = '👆 请先按下方【▶️ 开始点货】';
+
+        submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = 'auto'; // 恢復觸摸
+        submitBtn.style.background = '#007aff';
+        submitBtn.style.color = 'white';
+        submitBtn.innerText = '▶️ 开始点货';
+      }
     }
 
     function renderAll() {
       renderWarehouses();
       renderItems();
+      renderYesterdayStock(); // 👈 新增這行：同步檢查並刷新昨日庫存
       renderSettings();
+      updatePointingUI();
     }
 
-    window.deleteIC = function(key) { delete itemCodes[key]; save(); renderSettings(); };
-    window.deleteIR = function(key) { delete itemRates[key]; save(); renderSettings(); };
+    window.deleteIC = function(key) { delete itemCodes[key]; save(); syncToCloud(); renderSettings(); };
+    window.deleteIR = function(key) { delete itemRates[key]; save(); syncToCloud(); renderSettings(); };
+    
+    // 🟢 刪除雲端 ITEM
+    window.deleteDBItem = async function(item) {
+      try {
+        const res = await fetch(`${API_URL}/base-items/${encodeURIComponent(item)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          allItems = allItems.filter(i => i !== item);
+          originalItemsSet = new Set(allItems.map(i => i.toUpperCase()));
+          renderSettings();
+        }
+      } catch(e) {
+        showToast('❌ 刪除失敗，請檢查網路');
+      }
+    };
 
-    function parseLine(text) {
-      const cleanText = text.replace(/[\u200b-\u200f\u202a-\u202e\ufeff]/g, '').trim();
-      const cnNums = '零一二三四五六七八九十百千万两';
-      const enNums = '0123456789０１２３４５６７８９';
-      
-      let unit = '';
-      let numStr = '';
-      let i = cleanText.length - 1;
-      
-      while (i >= 0) {
-        const char = cleanText[i];
-        if (/[a-zA-Z\u4e00-\u9fa5]/.test(char) && cnNums.indexOf(char) === -1) {
-          unit = char + unit;
-          i--;
+    // 🟢 批量覆蓋到雲端
+    $('sync-db-btn').addEventListener('click', async () => {
+      const text = $('db-batch-input').value.trim();
+      if (!text) { showToast('請先貼上代碼'); return; }
+
+      // 按換行切割、去除空白
+      const newItems = text.split('\n').map(s => s.trim()).filter(s => s);
+      if (newItems.length === 0) { showToast('沒有有效的代碼'); return; }
+
+      if (!confirm(`即將用貼上的 ${newItems.length} 條代碼替換雲端原有的 ${allItems.length} 條數據，確定嗎？`)) return;
+
+      $('sync-db-btn').textContent = '同步中...';
+      $('sync-db-btn').disabled = true;
+
+      try {
+        const res = await fetch(`${API_URL}/base-items/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: newItems })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('✅ 雲端覆蓋成功');
+          $('db-batch-input').value = '';
+          await fetchBaseItems(); // 重新拉取
         } else {
-          break;
+          showToast('❌ 失敗：' + data.message);
         }
+      } catch(e) {
+        showToast('❌ 網路錯誤');
+      } finally {
+        $('sync-db-btn').textContent = '☁️ 覆盖导入云端';
+        $('sync-db-btn').disabled = false;
       }
+    });
+
+    // 🟢 刷新雲端數據
+    $('fetch-db-btn').addEventListener('click', () => {
+      showToast('⏳ 刷新中...');
+      fetchBaseItems();
+      fetchMemories();
+    });
+
+    // 🟢 單條新增到雲端
+    $('add-db-item-btn').addEventListener('click', async () => {
+      const newItem = $('new-db-item').value.trim();
+      if (!newItem) { showToast('請輸入 ITEM 代碼'); return; }
       
-      while (i >= 0 && /\s/.test(cleanText[i])) { i--; }
-      
-      while (i >= 0) {
-        const char = cleanText[i];
-        if (cnNums.indexOf(char) !== -1 || enNums.indexOf(char) !== -1 || char === '.') {
-          numStr = char + numStr;
-          i--;
-        } else {
-          break;
+      const exists = allItems.some(i => i.toUpperCase() === newItem.toUpperCase());
+      if (exists) { showToast('該 ITEM 已存在於資料庫中'); return; }
+
+      try {
+        const res = await fetch(`${API_URL}/base-items/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: newItem })
+        });
+        const data = await res.json();
+        if (data.success) {
+          $('new-db-item').value = '';
+          await fetchBaseItems(); // 重新拉取以更新 UI
+          showToast('✅ 已新增');
         }
+      } catch(e) {
+        showToast('❌ 新增失敗');
       }
-      
-      const name = cleanText.substring(0, i + 1).trim();
-      
-      if (name && numStr) {
-        const halfNum = numStr.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-        const rawQty = cnToNum(halfNum);
-        return { name, unit, rawQty, original: text };
+    });
+
+    // ======= 阿里雲 語音辨識 =======
+    let mediaRecorder;
+    let isInitializing = false; 
+    let audioChunks = [];
+    const pttBtn = $('ptt-btn');
+
+    async function initAudio() {
+      if (mediaRecorder || isInitializing) return;
+      isInitializing = true;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 } 
+        });
+        
+        // 兼容性更好的录音格式探测（之前提过，加上更稳）
+        const formats = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'];
+        let mimeType = '';
+        for (let f of formats) {
+          if (MediaRecorder.isTypeSupported(f)) {
+            mimeType = f;
+            break;
+          }
+        }
+        const options = mimeType ? { mimeType } : {};
+        
+        mediaRecorder = new MediaRecorder(stream, options);
+        
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          audioChunks = []; 
+          showToast('⏳ 阿里雲粵語辨識中...');
+          await transcribeAudio(audioBlob);
+        };
+      } catch (err) {
+        showToast('❌ 無法取得麥克風權限');
+        console.error(err);
+      } finally {
+        isInitializing = false;
       }
-      return null;
     }
 
+    async function transcribeAudio(blob) {
+      isProcessingAudio = true; 
+      const formData = new FormData();
+      formData.append('file', blob, 'record.webm');
+
+      // 创建超时控制器和 10 秒定时器
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+      try {
+        const response = await fetch(`${API_URL}/transcribe`, { 
+          method: 'POST', 
+          body: formData,
+          signal: controller.signal // 绑定超时信号
+        });
+        
+        clearTimeout(timeoutId); // 成功收到回复，立刻清除定时器
+
+        if (!response.ok) throw new Error('服务器响应错误');
+        const result = await response.json();
+        
+        if (result.text) {
+          let text = result.text.replace(/[，。！？、,!]/g, '').replace(/\s/g, '');
+          showToast(`✅ ${text}`);
+          
+          items.push({ 
+            name: text, 
+            qty: '',      
+            unit: '',     
+            warehouse: currentWarehouse, 
+            synced: false, 
+            operator: currentUser.nickname,
+            localId: Date.now() + '_' + Math.random().toString(36).substr(2, 5) 
+          });
+          save(); 
+          renderItems();
+          
+          // 👇 新增這行：等待畫面渲染後，平滑滾動到網頁最底下
+          setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+          
+        } else {
+          showToast('⚠️ 聽不清楚，請再試一次');
+        }
+      } catch (error) {
+        clearTimeout(timeoutId); // 发生错误也要清理
+        console.error(error);
+
+        // 区分是超时还是普通断网报错
+        if (error.name === 'AbortError') {
+          showToast('❌ 网络不良，识别超时（超过10秒）');
+        } else {
+          showToast('❌ 网络不良，无法连接阿里云');
+        }
+
+      } finally {
+        isProcessingAudio = false; 
+        pttBtn.disabled = false;
+        pttBtn.innerText = '🎙️ 按住說話';
+      }
+    }
+
+    async function startRecording(e) {
+      if (e) e.preventDefault();
+      if (isPressing) return;
+
+      const lockStatus = activeLocks[currentWarehouse] || '';
+      const isCompleted = lockStatus.includes('(已完成)');
+      const isAdminOrSup = currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor');
+
+      // 🛡️ 防線 1：尚未點擊「開始點貨」，一律強制中斷錄音
+      if (!lockStatus) {
+        showToast('👆 请先按下方【▶️ 开始点货】');
+        return;
+      }
+
+      // 🛡️ 防線 2：已完成狀態下，工人絕對禁止錄音（僅主管/管理員可補充）
+      if (isCompleted && !isAdminOrSup) {
+        showToast('🔒 该仓库已完成点货，工人无法再录音');
+        return;
+      }
+
+      // 🛡️ 防線 3：倉庫被其他人操作中
+      if (lockStatus !== currentUser?.nickname && !lockStatus.startsWith(currentUser?.nickname + ' ')) {
+        showToast(`⚠️ 仓库正被 ${lockStatus} 操作中`);
+        return;
+      }
+
+      // 🛡️ 防線 4：如果按鈕本身處於 disabled 狀態，直接退出
+      if (pttBtn.disabled) return;
+
+      if (!navigator.onLine) { showToast('❌ 当前无网络'); return; }
+      if (isProcessingAudio) return;
+
+      isPressing = true;
+
+      await initAudio(); 
+      if (!isPressing) return;
+      if (!mediaRecorder || mediaRecorder.state === 'recording') return;
+
+      audioChunks = [];
+      mediaRecorder.start();
+      pttBtn.style.background = '#ff3b30'; 
+      pttBtn.innerText = '🎙️ 錄音中... (放開送出)';
+    }
+
+    // 👇 补全你丢失的 stopRecording 函数
+    function stopRecording(e) {
+      if (e) e.preventDefault();
+      isPressing = false;
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        pttBtn.style.background = 'var(--primary)'; 
+        pttBtn.innerText = '⏳ 识别中...';
+        pttBtn.disabled = true; // 识别期间禁用按钮
+      }
+    }
+
+    // 事件监听（加上了 mouseleave 和 touchcancel）
+    pttBtn.addEventListener('touchstart', startRecording, { passive: false });
+    pttBtn.addEventListener('touchend', stopRecording);
+    pttBtn.addEventListener('touchcancel', stopRecording); 
+    pttBtn.addEventListener('mousedown', startRecording);
+    pttBtn.addEventListener('mouseup', stopRecording);
+    pttBtn.addEventListener('mouseleave', stopRecording);  
+  
+    // ======= 确认提交逻辑（已移除重複宣告） =======
+    $('confirm-submit-btn').addEventListener('click', async () => {
+      
+      // ✅ 頂部宣告一次即可
+      const lockStatus = activeLocks[currentWarehouse] || '';
+
+      // 1. 判斷目前是不是「未開始」狀態
+      if (!lockStatus) {
+        const btn = $('confirm-submit-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ 锁定中...';
+        try {
+          await lockWarehouse(currentWarehouse, currentUser?.nickname);
+          showToast(`✅ 已锁定【${currentWarehouse}】，可以开始录音了`);
+        } catch(e) {
+          showToast('❌ 锁定失败，请检查网络');
+          btn.disabled = false;
+          btn.textContent = '▶️ 开始点货';
+        }
+        return; // 鎖定完中斷，不往下跑提交
+      }
+
+      // 2. 找出当前仓库所有还没上传的数据
+      const unsyncedItems = items.filter(it => it.warehouse === currentWarehouse && it.synced === false);
+      
+      if (unsyncedItems.length === 0) {
+        showToast('当前仓库没有新的点货记录需要提交');
+        return;
+      }
+
+      // 檢查是否有漏填數量或單位
+      const hasEmptyFields = unsyncedItems.some(it => it.qty === '' || it.unit === '' || it.qty == null);
+      if (hasEmptyFields) {
+        alert('⚠️ 發現未填寫完整的項目！\n請確定所有新增的貨件都已輸入「數量」並選擇「單位」才能提交。');
+        return;
+      }
+
+      // 3. 弹出警告确认框（這裡直接使用最上面宣告好的 lockStatus）
+      const isCompleted = lockStatus.includes('(已完成)');
+      const confirmMsg = isCompleted 
+        ? `⚠️ 确认提交补充的记录吗？` 
+        : `⚠️ 确认提交【${currentWarehouse}】的点货记录吗？\n\n提交后，该仓库将被锁定为“已完成”状态，所有工人将无法再操作，只有主任或管理员可以修改。`;
+        
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      const btn = $('confirm-submit-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在提交至云端...';
+
+      try {
+        // 批量发给后端
+        const res = await fetch(`${API_URL}/items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: unsyncedItems }) 
+        });
+        
+        if (!res.ok) throw new Error(`服务器异常: ${res.status}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || '数据库写入失败');
+
+        // 标记为已同步
+        items.forEach(it => {
+          if (it.warehouse === currentWarehouse && it.synced === false) {
+            it.synced = true;
+          }
+        });
+        
+        lockedWarehouses[currentWarehouse] = true;
+        
+        // 保持第一個人點貨的名字
+        let currentLock = activeLocks[currentWarehouse] || currentUser.nickname;
+        let finishedTag = currentLock;
+        if (!finishedTag.includes('(已完成)')) {
+          finishedTag = `${currentLock} (已完成)`;
+        }
+        
+        await lockWarehouse(currentWarehouse, finishedTag);
+        
+        save();
+        renderAll();
+        
+        if ($('page-convert').classList.contains('active')) {
+           executeParse();
+        }
+        
+        showToast(`✅ 成功提交 ${unsyncedItems.length} 条记录，该仓已锁定`);
+
+      } catch (err) {
+        console.error('提交失败：', err);
+        alert(`❌ 提交失败：${err.message}\n\n数据仍安全保存在平板上，请检查网络后重试。`);
+      } finally {
+        updatePointingUI(); // 👈 提交結束後自動依權限與狀態更新按鈕文字與顏色
+      }
+    });
+
+    // ======= 后台同步逻辑 =======
+    async function autoSyncCloudData(isForce = false) {
+      // 👇 升級 1：如果本地有「未提交」的修改，暫停背景自動同步，直到按下提交後才恢復
+      const hasUnsubmitted = items.some(it => it.synced === false);
+      if (hasUnsubmitted && !isForce) {
+        return; 
+      }
+
+      try {
+        // 強制每次請求都是獨立最新，拒絕平板瀏覽器快取
+        const res = await fetch(`${API_URL}/items?_t=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+        
+        if (data.success && data.items) {
+          const cloudItems = data.items;
+          
+          // 強制將伺服器傳回的資料，依據 MongoDB 的 _id 進行「舊 -> 新」排序
+          cloudItems.sort((a, b) => {
+            if (a._id && b._id) {
+              return a._id.localeCompare(b._id); 
+            }
+            return 0;
+          });
+          
+          const mergedList = [];
+          const processedCloudIds = new Set();
+          
+          // 處理雲端傳回的資料
+          cloudItems.forEach(cloudIt => {
+            let finalItem = { ...cloudIt, synced: true };
+            
+            const localMatchIndex = items.findIndex(localIt => {
+                if (localIt._id && cloudIt._id) {
+                    return localIt._id === cloudIt._id;
+                }
+                return localIt.localId === cloudIt.localId;
+            });
+
+            if (localMatchIndex !== -1) {
+                const localMatch = items[localMatchIndex];
+                if (localMatch.synced === false) {
+                    finalItem = { ...localMatch, _id: cloudIt._id }; 
+                }
+                if(cloudIt._id) processedCloudIds.add(cloudIt._id);
+                if(cloudIt.localId) processedCloudIds.add(cloudIt.localId);
+            }
+            mergedList.push(finalItem);
+          });
+          
+          // 附加本地新增、但尚未同步到雲端的資料
+          items.forEach(localIt => {
+             const hasBeenProcessed = (localIt._id && processedCloudIds.has(localIt._id)) || 
+                                      (localIt.localId && processedCloudIds.has(localIt.localId));
+                                      
+            if (!hasBeenProcessed && localIt.synced === false) {
+                mergedList.push(localIt);
+            }
+          });
+          
+          items = mergedList;
+          save(); 
+          renderItems();
+
+          // 👇 升級 2：如果人剛好在轉換頁，只在「強制同步 (isForce)」時才重繪表格，避免 10 秒一次的背景同步吃掉焦點
+          if ($('page-convert').classList.contains('active')) {
+             if (isForce) {
+                 executeParse();
+             }
+          }
+          if (isForce) showToast('✅ 已同步云端最新資料');
+        }
+      } catch (e) {
+        console.error('同步失败', e);
+        if (isForce) showToast('❌ 同步失败，请检查网络');
+      }
+    }
+
+    // 绑定“同步資料”按钮（同时拉取数据和锁定状态）
+    $('force-sync-btn').addEventListener('click', () => {
+      fetchLocks(); // 👈 新增：立刻刷新锁定状态
+      autoSyncCloudData(true);
+    });
+
+    // 启动每分钟自动同步
+    setInterval(autoSyncCloudData, 10000);
+
+    // 👇👇👇 執行轉換函數 (直接讀取陣列版) 👇👇👇
     function executeParse() {
-      const rawText = $('convert-textarea').value;
-      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l);
       const container = $('convert-results');
       
-      if (lines.length === 0) {
-        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #86868b; font-size: 14px;">没有可转换的内容</div>';
+      // 👇 升級：只抓取當前倉庫中「已經成功提交到雲端」的正式資料
+      const parsedItems = items.filter(it => it.warehouse === currentWarehouse && it.synced !== false);
+
+      if (parsedItems.length === 0) {
+        container.innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库暂无点货记录</div>';
         return;
       }
 
@@ -862,26 +1653,19 @@ TMD1cm-kg`;
               <th class="col-original">原文</th>
               <th class="col-code">ITEM CODE</th>
               <th class="col-qty">QUANTITY</th>
-              <th class="col-rate">专属倍率</th>
+              <th class="col-rate">專屬倍率</th>
             </tr>
           </thead>
           <tbody>
       `;
 
-      lines.forEach((line) => {
-        const parsed = parseLine(line);
-        if (!parsed) {
-          tableHTML += `
-            <tr>
-              <td colspan="4" style="color:#ff3b30; padding: 12px;">⚠️ 无法解析：${escapeHtml(line)}</td>
-            </tr>
-          `;
-          return;
-        }
-
-        const { name, unit, rawQty, original } = parsed;
-        const code = itemCodes[name] || '';
+      parsedItems.forEach((item) => {
+        const name = item.name || '';
+        const unit = item.unit || '';
+        const rawQty = parseFloat(item.qty) || 0; 
         
+        const originalText = `${name} ${rawQty} ${unit}`;
+        const code = itemCodes[name] || '';
         const rateKey = name + '_' + unit;
         const savedRate = itemRates[rateKey];
         const initRate = savedRate !== undefined ? savedRate : 1; 
@@ -889,9 +1673,9 @@ TMD1cm-kg`;
 
         tableHTML += `
           <tr class="data-row" data-name="${escapeHtml(name)}" data-unit="${escapeHtml(unit)}" data-rawqty="${rawQty}">
-            <td class="col-original">${escapeHtml(original)}</td>
-            <td><input type="text" class="inp-code" value="${escapeHtml(code)}" placeholder="输入CODE"></td>
-            <td><input type="number" class="inp-qty" value="${initQty}"></td>
+            <td class="col-original">${escapeHtml(originalText)}</td>
+            <td><input type="text" class="inp-code" value="${escapeHtml(code)}" placeholder="輸入CODE" style="background-color: ${code ? '#d4edda' : '#fafafa'}; border-color: ${code ? '#28a745' : '#d1d1d6'}; font-weight: ${code ? 'bold' : 'normal'};"></td>
+            <td><input type="number" class="inp-qty" value="${initQty}" step="any"></td>
             <td><input type="number" class="inp-rate" value="${initRate}" step="any"></td>
           </tr>
         `;
@@ -899,99 +1683,145 @@ TMD1cm-kg`;
 
       tableHTML += `</tbody></table>`;
       container.innerHTML = tableHTML;
-    }
-
-    $('convert-textarea').addEventListener('input', (e) => {
-      convertState[currentWarehouse] = e.target.value;
-      save();
-    });
-
-    $('convert-results').addEventListener('input', (e) => {
-      const input = e.target;
-      const tr = input.closest('.data-row');
-      if (!tr) return;
       
-      const name = tr.dataset.name;
-      const unit = tr.dataset.unit;
-      const rawQty = parseFloat(tr.dataset.rawqty) || 0;
-      if (!name) return;
-
-      const rateKey = name + '_' + unit;
-      const codeInput = tr.querySelector('.inp-code');
-      const rateInput = tr.querySelector('.inp-rate');
-      const qtyInput = tr.querySelector('.inp-qty');
-
-      if (input.classList.contains('inp-code')) {
-        const codeVal = codeInput.value.trim();
-        if (codeVal) itemCodes[name] = codeVal;
-        else delete itemCodes[name];
-        save();
+      bindResultTableEvents();
+      updateConfirmBtnUI();
+    }
+     
+    // 👇 更新確認按鈕的外觀
+    function updateConfirmBtnUI() {
+      const btn = $('confirm-wh-convert-btn');
+      if (!btn) return;
+      if (confirmedWarehouses[currentWarehouse]) {
+        btn.textContent = '🔒 已确认内容';
+        btn.style.background = '#86868b'; // 變灰
+      } else {
+        btn.textContent = '✅ 确认点货内容';
+        btn.style.background = '#34c759'; // 變綠
       }
-
-      if (input.classList.contains('inp-rate')) {
-        const newRate = parseFloat(rateInput.value);
-        if (!isNaN(newRate)) {
-          if (newRate === 1) delete itemRates[rateKey];
-          else itemRates[rateKey] = newRate;
-          save();
-          qtyInput.value = parseFloat((rawQty * newRate).toFixed(4));
-        }
-      }
-
-      if (input.classList.contains('inp-qty')) {
-        const newQty = parseFloat(qtyInput.value);
-        if (!isNaN(newQty) && rawQty > 0) {
-          const calculatedRate = parseFloat((newQty / rawQty).toFixed(4));
-          rateInput.value = calculatedRate;
-          if (calculatedRate === 1) delete itemRates[rateKey];
-          else itemRates[rateKey] = calculatedRate;
-          save();
-        }
-      }
-    });
-
-    const transcript = $('transcript');
-    const addBtn = $('add-btn');
-    
-    function addRecord() {
-      const text = transcript.value.trim();
-      if (!text) return;
-      items.push({ name: text, warehouse: currentWarehouse });
-      transcript.value = '';
-      save();
-      renderItems();
     }
 
-    addBtn.addEventListener('mousedown', e => e.preventDefault());
-    addBtn.addEventListener('touchstart', e => e.preventDefault(), {passive: false});
-    addBtn.addEventListener('click', () => { addRecord(); transcript.focus(); });
-    transcript.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addRecord(); }
+    // 👇 綁定確認按鈕點擊事件
+    $('confirm-wh-convert-btn').addEventListener('click', () => {
+      // 🚨 新增防呆：檢查是否有「未提交」的資料
+      const hasUnsubmitted = items.some(it => it.warehouse === currentWarehouse && it.synced === false);
+      if (hasUnsubmitted) {
+        alert('⚠️ 无法确认！\n当前仓库还有「未提交」的修改，请先回到【📝 点货页】按下红色的提交按钮！');
+        return;
+      }
+
+      // 只檢查已成功提交到雲端的正式資料
+      const parsedItems = items.filter(it => it.warehouse === currentWarehouse && it.synced !== false);
+      if (parsedItems.length === 0) {
+        showToast('当前仓库无数据可确认');
+        return;
+      }
+      
+      // 檢查是否所有 ITEM 都填了 CODE
+      const allCoded = parsedItems.every(it => itemCodes[it.name]);
+      if (!allCoded) {
+        alert('⚠️ 请先填妥所有货物的 ITEM CODE（全变绿色）后再按确认！');
+        return;
+      }
+
+      confirmedWarehouses[currentWarehouse] = true;
+      save();
+      updateConfirmBtnUI();
+      showToast(`✅ 【${currentWarehouse}】转换内容已确认`);
     });
 
-    $('go-convert-btn').addEventListener('click', () => {
-      updateConvertTextareaFromItems(false);
-      document.querySelector('.nav-item[data-target="page-convert"]').click();
-    });
+    // 👇👇👇 新增：绑定表格里的输入事件（双向联动） 👇👇👇
+    function bindResultTableEvents() {
+      document.querySelectorAll('#convert-results .data-row').forEach(tr => {
+        const name   = tr.dataset.name;
+        const unit   = tr.dataset.unit;
+        const rawQty = parseFloat(tr.dataset.rawqty) || 0;
 
-    $('pull-data-btn').addEventListener('click', () => {
-      updateConvertTextareaFromItems(true);
-    });
+        const codeIn = tr.querySelector('.inp-code');
+        const qtyIn  = tr.querySelector('.inp-qty');
+        const rateIn = tr.querySelector('.inp-rate');
 
-    $('execute-convert-btn').addEventListener('click', () => {
-      executeParse();
-      showToast('解析完成');
-    });
+        // ① 修改 ITEM CODE -> 自动记忆 (加入變綠色邏輯)
+        codeIn.addEventListener('input', () => {
+          const v = codeIn.value.trim().toUpperCase();
+          if (v) {
+            itemCodes[name] = v;
+            codeIn.style.backgroundColor = '#d4edda';
+            codeIn.style.borderColor = '#28a745';
+            codeIn.style.fontWeight = 'bold';
+          } else {
+            delete itemCodes[name];
+            codeIn.style.backgroundColor = '#fafafa';
+            codeIn.style.borderColor = '#d1d1d6';
+            codeIn.style.fontWeight = 'normal';
+          }
+          // 只要有修改，就解除該倉庫的確認狀態
+          confirmedWarehouses[currentWarehouse] = false;
+          updateConfirmBtnUI();
+          
+          save();
+          syncToCloud();
+        });
 
-    // ================= 匯出 Excel (包含所有 ITEM，新品置底標紅) =================
+        // ② 修改【专属倍率】 -> 数量框自动跟着变
+        rateIn.addEventListener('input', () => {
+          const r = parseFloat(rateIn.value);
+          if (isNaN(r)) return;
+          
+          itemRates[name + '_' + unit] = r; // 存入记忆
+          qtyIn.value = parseFloat((rawQty * r).toFixed(4)); // 自动计算数量
+          save();
+          syncToCloud();
+        });
+
+        // ③ 修改【数量】 -> 专属倍率自动反推算（如 100 / 10 = 10）
+        qtyIn.addEventListener('input', () => {
+          const q = parseFloat(qtyIn.value);
+          if (isNaN(q)) return;
+          
+          let newRate = 1;
+          if (rawQty > 0) {
+            // 反推算倍率，并保留4位小数防止出现 3.000000001 这种数字
+            newRate = parseFloat((q / rawQty).toFixed(4)); 
+          }
+          
+          rateIn.value = newRate; // 更新倍率框
+          itemRates[name + '_' + unit] = newRate; // 存入记忆
+          save();
+          syncToCloud();
+        });
+      });
+    }
+
+    // ================= 匯出 Excel =================
     $('export-csv-btn').addEventListener('click', () => {
+      // 👇 新增：檢查所有「有貨物」的倉庫是否都已點擊確認，並且是否真的都有填 CODE
+      const unconfirmedList = [];
+      warehouses.forEach(wh => {
+        const whItems = items.filter(it => it.warehouse === wh);
+        if (whItems.length === 0) return; // 空倉庫不計較
+        
+        const allCoded = whItems.every(it => itemCodes[it.name]);
+        if (!confirmedWarehouses[wh] || !allCoded) {
+          unconfirmedList.push(wh);
+          confirmedWarehouses[wh] = false; // 如果後來雲端同步了新貨物漏填 CODE，強制校正回未確認
+        }
+      });
+
+      if (unconfirmedList.length > 0) {
+        alert(`⚠️ 无法导出 Excel！\n\n以下仓库尚未确认内容，或遗漏了 ITEM CODE：\n【${unconfirmedList.join('、')}】\n\n请前往转换页完成填写，并点击绿色的 [确认点货内容]`);
+        return;
+      }
       let pointData = {};
       
       items.forEach(it => {
-        const parsed = parseLine(it.name);
-        if (!parsed) return;
+        // 直接從 it 裡面取值，不需要 parseLine 了！
+        const name = it.name || '';
+        const unit = it.unit || '';
+        const rawQty = parseFloat(it.qty) || 0;
         
-        const { name, unit, rawQty } = parsed;
+        if (!name || rawQty === 0) return; // 防呆
+        
         const code = itemCodes[name] || name; 
         const rate = itemRates[name + '_' + unit] !== undefined ? itemRates[name + '_' + unit] : 1;
         const qty = rawQty * rate;
@@ -1003,31 +1833,26 @@ TMD1cm-kg`;
         pointData[key].warehouses[wh] += qty;
       });
 
-      // 區分原有清單和全新 Item
       let oldCodes = [];
       let newCodes = [];
 
-      // 原本的 Item 清單 (A-Z 排序)
-      ALL_ITEMS.forEach(item => {
+      allItems.forEach(item => {
         const key = item.toUpperCase();
         oldCodes.push(key);
       });
       oldCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
-      // 找出新出現的 Item
       Object.keys(pointData).forEach(key => {
-        if (!ORIGINAL_ITEMS_SET.has(key)) {
+        if (!originalItemsSet.has(key)) {
           newCodes.push(key);
         }
       });
       newCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
-      // 合併 (舊的在前，新的在後)
       const finalCodes = oldCodes.concat(newCodes);
       
-      // 建立快速查詢 Map
       let allItemMap = new Map();
-      ALL_ITEMS.forEach(item => allItemMap.set(item.toUpperCase(), item));
+      allItems.forEach(item => allItemMap.set(item.toUpperCase(), item));
       Object.keys(pointData).forEach(key => {
         if (!allItemMap.has(key)) allItemMap.set(key, pointData[key].originalCode);
       });
@@ -1037,7 +1862,6 @@ TMD1cm-kg`;
         return;
       }
 
-      // 構建預覽表格 HTML
       let previewHTML = `<thead><tr><th>Item</th>`;
       warehouses.forEach(w => previewHTML += `<th>${escapeHtml(w)}</th>`);
       previewHTML += `<th>Total</th></tr></thead><tbody>`;
@@ -1045,7 +1869,7 @@ TMD1cm-kg`;
       currentExcelData = [];
 
       finalCodes.forEach(key => {
-        const isNew = !ORIGINAL_ITEMS_SET.has(key);
+        const isNew = !originalItemsSet.has(key);
         const displayCode = allItemMap.get(key);
         const whData = pointData[key] ? pointData[key].warehouses : {};
         
@@ -1072,11 +1896,9 @@ TMD1cm-kg`;
       previewHTML += `</tbody>`;
       $('preview-table').innerHTML = previewHTML;
       
-      // 顯示預覽視窗
       $('csv-modal').classList.add('active');
     });
 
-    // 確認下載 Excel
     $('confirm-download-btn').addEventListener('click', () => {
       let excelContent = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -1119,7 +1941,6 @@ TMD1cm-kg`;
       excelContent += `<th class="col-total">Total</th></tr></thead><tbody>`;
 
       currentExcelData.forEach(row => {
-        // 根據是否為新品設定顏色
         const colorStyle = row.isNew ? 'color: red;' : '';
         const fontStyle = row.isNew ? 'font-weight: bold;' : '';
 
@@ -1151,21 +1972,216 @@ TMD1cm-kg`;
       showToast('✅ Excel 下载成功');
     });
 
-    // 取消下載
     $('cancel-download-btn').addEventListener('click', () => {
       $('csv-modal').classList.remove('active');
     });
 
-    $('item-list').addEventListener('click', (e) => {
-      const btn = e.target.closest('.delete-btn');
-      if (!btn) return;
-      const idx = parseInt(btn.dataset.index, 10);
-      if (!isNaN(idx)) {
-        items.splice(idx, 1);
-        save();
+    // ======= 自訂數字鍵盤與單位選擇變數 (全域) =======
+    let activeItemForModal = null;
+    let numpadBuffer = '';
+    let pendingYesterdayItem = null; // 👈 新增：追蹤剛從昨日結存點入、等待確認數量的項目
+
+    // ======= 清單統一點擊處理 (包含修改、刪除、數量、單位) =======
+    $('item-list').addEventListener('click', async (e) => {
+      
+      // 1. 點擊修改按鈕 (✏️)
+      const editBtn = e.target.closest('.edit-btn');
+      if (editBtn) {
+        const idx = parseInt(editBtn.dataset.index, 10);
+        const clickedItem = items[idx];
+        if (!clickedItem) return;
+        
+        showInputModal('修改货物名称', clickedItem.name, async (newVal) => {
+          if (!newVal || newVal === clickedItem.name) return;
+          
+          // 👇 升級：因為等待輸入時可能發生自動同步，需從最新 items 找回這筆資料
+          let target = items.find(it => 
+            (it._id && it._id === clickedItem._id) || 
+            (it.localId && it.localId === clickedItem.localId) || 
+            (it.name === clickedItem.name && it.warehouse === clickedItem.warehouse)
+          );
+          if (!target) return; // 防呆
+          
+          const oldName = target.name;
+          const wasSynced = target.synced !== false; 
+          
+          target.name = newVal;
+          target.synced = false; 
+          target.operator = currentUser?.nickname || target.operator; // 👈 新增：更新為當前修改的人
+          save(); 
+          renderItems();
+          
+          if (currentUser && currentUser.role === 'admin') {
+             try {
+                // 不再需要 DELETE 舊資料！因為我們有 _id，直接 POST 過去後端就會「精準更新」它的名字！
+                const res = await fetch(`${API_URL}/items`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ items: [target] }) 
+                });
+                const data = await res.json();
+                if (data.success) {
+                  target.synced = true;
+                  save(); 
+                  renderItems();
+                  showToast('✅ 已修改并直接同步至云端');
+                } else {
+                  showToast('⚠️ 本地已修改，但云端同步失败');
+                }
+             } catch (err) { 
+                console.error('云端修改失败', err); 
+                showToast('⚠️ 本地已修改，但云端同步失败');
+             }
+          } else {
+             showToast('✅ 已修改，请记得重新确认提交');
+          }
+        });
+        return;
+      }
+
+      // 2. 點擊刪除按鈕 (✕)
+      const delBtn = e.target.closest('.delete-btn');
+      if (delBtn) {
+        const idx = parseInt(delBtn.dataset.index, 10);
+        if (isNaN(idx)) return;
+        const target = items[idx];
+        if (!target) return;
+        
+        // 👇 升級 1：立刻在本地過濾刪除並重繪，不再等待 await 造成序號錯亂
+        items = items.filter(it => 
+          !( (it._id && it._id === target._id) || 
+             (it.localId && it.localId === target.localId) || 
+             (it.name === target.name && it.warehouse === target.warehouse && it.synced === false) )
+        );
+        save(); 
         renderItems();
+        
+        // 👇 升級 2：在背景發送刪除請求給伺服器 (不加 await 阻擋畫面)
+        if (target.synced !== false) {
+          fetch(`${API_URL}/items`, { 
+            method: 'DELETE', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ _id: target._id, name: target.name, warehouse: target.warehouse })
+          }).catch(err => console.error('删除云端失败', err));
+        }
+        return;
+      }
+
+      // 3. 點擊「輸入數量」方塊
+      const qtyBtn = e.target.closest('.item-qty-btn');
+      if (qtyBtn) {
+        if (qtyBtn.classList.contains('disabled')) return;
+        const idx = parseInt(qtyBtn.dataset.index, 10);
+        activeItemForModal = items[idx];
+        pendingYesterdayItem = null; // 👈 新增：正常修改已有數據，不觸發撤銷邏輯
+        if (!activeItemForModal) return;
+
+        numpadBuffer = (activeItemForModal.qty !== '' && activeItemForModal.qty != null) ? String(activeItemForModal.qty) : '';
+        $('numpad-display').textContent = numpadBuffer || '0';
+        $('numpad-modal').classList.add('active');
+        return;
+      }
+
+      // 4. 點擊「選擇單位」方塊
+      const unitBtn = e.target.closest('.item-unit-btn');
+      if (unitBtn) {
+        if (unitBtn.classList.contains('disabled')) return;
+        const idx = parseInt(unitBtn.dataset.index, 10);
+        activeItemForModal = items[idx];
+        if (!activeItemForModal) return;
+
+        $('unit-modal').classList.add('active');
+        return;
       }
     });
+
+    // ======= 數字鍵盤點擊處理 =======
+    document.getElementById('numpad-modal').addEventListener('click', (e) => {
+      const btn = e.target.closest('.numpad-btn');
+      if (!btn) return;
+      const key = btn.textContent.trim();
+
+      if (btn.id === 'numpad-del') {
+        numpadBuffer = numpadBuffer.slice(0, -1);
+      } else if (btn.id === 'numpad-clear') {
+        numpadBuffer = '';
+      } else if (btn.id === 'numpad-confirm') {
+        if (activeItemForModal) {
+          let target = items.find(it => 
+            (it.localId && it.localId === activeItemForModal.localId) || 
+            (it._id && it._id === activeItemForModal._id) || 
+            (it.name === activeItemForModal.name && it.warehouse === activeItemForModal.warehouse)
+          );
+          if (target) {
+            target.qty = numpadBuffer;
+            target.synced = false;
+            target.operator = currentUser?.nickname || target.operator;
+            save();
+            renderItems();
+          }
+        }
+        pendingYesterdayItem = null; // 👈 新增：點擊確定後正式保存，清除暫存標記
+        $('numpad-modal').classList.remove('active');
+        return;
+      } else {
+        if (key === '.') {
+          if (!numpadBuffer.includes('.')) {
+            numpadBuffer = numpadBuffer ? numpadBuffer + '.' : '0.';
+          }
+        } else if (/^[0-9]$/.test(key)) {
+          if (numpadBuffer === '0') {
+            numpadBuffer = key;
+          } else {
+            numpadBuffer += key;
+          }
+        }
+      }
+      $('numpad-display').textContent = numpadBuffer || '0';
+    });
+
+    // 🟢 替換為：取消時撤銷剛新增的項目並返回昨日結存
+    function cancelNumpad() {
+      if (pendingYesterdayItem) {
+        items = items.filter(it => it.localId !== pendingYesterdayItem.localId);
+        pendingYesterdayItem = null;
+        save();
+        renderItems();
+        renderYesterdayStock(); // 重新渲染，貨物立即返回昨日結存
+      }
+      activeItemForModal = null;
+      $('numpad-modal').classList.remove('active');
+    }
+
+    $('numpad-cancel').onclick = cancelNumpad;
+    $('numpad-modal').onclick = (e) => { 
+      if (e.target.id === 'numpad-modal') cancelNumpad(); 
+    };
+
+    // ======= 單位選擇處理 =======
+    document.querySelector('.unit-grid').addEventListener('click', (e) => {
+      const btn = e.target.closest('.unit-btn');
+      if (!btn) return;
+      const unitVal = btn.textContent.trim();
+      if (activeItemForModal) {
+        // 👇 升級：同樣從最新的 items 陣列中精準鎖定目標
+        let target = items.find(it => 
+          (it.localId && it.localId === activeItemForModal.localId) || 
+          (it._id && it._id === activeItemForModal._id) || 
+          (it.name === activeItemForModal.name && it.warehouse === activeItemForModal.warehouse)
+        );
+        if (target) {
+          target.unit = unitVal;
+          target.synced = false;
+          target.operator = currentUser?.nickname || target.operator; // 👈 新增：更新為當前修改的人
+          save();
+          renderItems();
+        }
+      }
+      $('unit-modal').classList.remove('active');
+    });
+
+    $('unit-cancel').onclick = () => $('unit-modal').classList.remove('active');
+    $('unit-modal').onclick = (e) => { if (e.target.id === 'unit-modal') $('unit-modal').classList.remove('active'); };
 
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1177,20 +2193,13 @@ TMD1cm-kg`;
         document.activeElement.blur();
         
         if (target === 'page-convert') {
-          const cachedText = convertState[currentWarehouse];
-          if (cachedText !== undefined) {
-            $('convert-textarea').value = cachedText;
-            if (cachedText.trim()) {
-              executeParse();
-            } else {
-              $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
-            }
-          } else {
-            $('convert-textarea').value = '';
-            $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库未点货，请点击「📥 拉取数据」</div>';
-          }
+          executeParse(); 
         } else if (target === 'page-settings') {
           renderSettings();
+        } else if (target === 'page-users') {
+          fetchUsers();
+        } else if (target === 'page-history') { // 👈 新增歷史頁的觸發
+          fetchHistory();
         }
       });
     });
@@ -1203,9 +2212,44 @@ TMD1cm-kg`;
         $('new-item-name').value = '';
         $('new-item-code').value = '';
         save(); renderSettings();
+      } else {
+        showToast('请填写完整的货名和CODE');
       }
     });
 
+// ======= 管理员：手动新增一条 =======
+    $('add-manual-item-btn').addEventListener('click', () => {
+      const lockStatus = activeLocks[currentWarehouse] || '';
+      const isCompleted = lockStatus.includes('(已完成)');
+      
+      // 只有在「别人正在点货」且「还没完成」时，才阻挡手动添加
+      if (lockStatus && lockStatus !== currentUser?.nickname && !isCompleted) {
+        showToast(`⚠️ 仓库正被 ${lockStatus} 操作，请稍后再添加`);
+        return;
+      }
+
+      showInputModal('手动新增货物', '', (val) => {
+        if (!val) return;
+        
+        // 只新增在本地，讓主任/管理員自己填寫數量後，再按綠色按鈕提交
+        const newItem = { 
+          name: val, 
+          qty: '', 
+          unit: '', 
+          warehouse: currentWarehouse, 
+          synced: false, 
+          operator: currentUser?.nickname,
+          localId: Date.now() + '_' + Math.random().toString(36).substr(2, 5) 
+        };
+        
+        items.push(newItem);
+        save(); 
+        renderItems();
+        showToast('✅ 已添加，填入数量和单位后，请点击绿色的【提交补充数据】');
+      });
+    });
+
+    // 👇👇👇 请把下面这一大段代码补充在这里 👇👇👇
     // ======== 倉庫管理選單邏輯 ========
     $('manage-wh-btn').addEventListener('click', () => {
       $('wh-modal').classList.add('active');
@@ -1233,6 +2277,7 @@ TMD1cm-kg`;
         
         currentWarehouse = newName;
         save(); renderAll();
+        syncToCloud(); 
         showToast('✅ 仓库名称已修改');
       });
     };
@@ -1247,10 +2292,31 @@ TMD1cm-kg`;
         }
         warehouses.push(newName);
         currentWarehouse = newName;
-        save(); renderAll();
+        save(); 
+        renderAll(); // 里面会自动调用 sortWarehouses 和重新渲染
+        syncToCloud(); // 👈 新增：立刻把新仓库推送到云端
         showToast('✅ 新仓库已添加');
       });
     };
+    
+    // ======= 管理员：解锁当前仓库 =======
+    $('unlock-wh-btn').addEventListener('click', async () => {
+      if (!confirm(`⚠️ 确定要解锁【${currentWarehouse}】吗？\n\n解锁后，该仓库的“已完成”状态将被解除，工人可以继续点货或修改。`)) {
+        return;
+      }
+
+      // 1. 解除云端的锁
+      await unlockWarehouse(currentWarehouse);
+
+      // 2. 清除本地保存的锁定状态
+      lockedWarehouses[currentWarehouse] = false;
+      save();
+      
+      // 3. 刷新界面（按钮会恢复成蓝色，可以按录音）
+      renderAll();
+      
+      showToast(`✅ 已解锁仓库【${currentWarehouse}】`);
+    });
 
     $('menu-remove').onclick = () => {
       $('wh-modal').classList.remove('active');
@@ -1270,7 +2336,9 @@ TMD1cm-kg`;
         delete convertState[oldName];
         
         currentWarehouse = warehouses[0];
-        save(); renderAll();
+        save(); 
+        renderAll();
+        syncToCloud(); // 👈 加上这句，把删除操作同步到云端
         showToast('🗑️ 仓库已移除');
       }
     };
@@ -1324,22 +2392,424 @@ TMD1cm-kg`;
       }
     });
 
-    $('clear-items-btn').addEventListener('click', () => {
-      if (confirm('⚠️ 确定要清除所有“点货记录”及“转换页内容”吗？\n\n（注意：设置的“记忆数据”和“仓名”将会保留）')) {
-        items = []; 
-        convertState = {}; 
-        $('convert-textarea').value = '';
-        $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">点击上方按钮执行转换</div>';
-        save();
-        renderItems();
-        showToast('🗑️ 点货和转换数据已清空');
+    $('clear-items-btn').addEventListener('click', async () => {
+      if (confirm('⚠️ 确定要彻底清除所有“点货记录”及“转换页内容”吗？\n\n（注意：这也会同步清空云端的所有点货数据，但设置的“记忆数据”和“仓名”会保留）')) {
+        
+        const btn = $('clear-items-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '⏳ 正在清理云端数据...';
+        btn.disabled = true;
+
+        try {
+          // 1. 逐一刪除雲端資料庫裡的點貨紀錄
+          const deletePromises = items.map(it => {
+            return fetch(`${API_URL}/items`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: it.name, warehouse: it.warehouse })
+            }).catch(e => console.error(e));
+          });
+          await Promise.all(deletePromises);
+
+          // 2. 清除雲端所有的倉庫鎖定狀態
+          for (const wh of warehouses) {
+            await fetch(`${API_URL}/locks/${encodeURIComponent(wh)}`, { method: 'DELETE' }).catch(e => {});
+          }
+
+          // 3. 清空本地所有暫存與狀態
+          items = []; 
+          convertState = {}; 
+          lockedWarehouses = {};
+          confirmedWarehouses = {};
+          activeLocks = {}; // 立刻清除鎖定UI
+
+          $('convert-results').innerHTML = '<div style="padding: 30px; text-align: center; color: #86868b; font-size: 14px;">当前仓库暂无点货记录</div>';
+          
+          save();
+          renderAll(); // 重新渲染畫面
+          showToast('🗑️ 点货和转换数据已彻底清空');
+
+        } catch (err) {
+          showToast('❌ 清理过程发生错误，请检查网络');
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
       }
     });
 
     // 啟動
     load();
     renderAll();
-  })();
+    fetchMemories();
+    fetchHistory(); // 👈 新增這行：啟動時預先加載歷史資料供對照
+    autoSyncCloudData();
+
+    // ======= 歷史記錄 JS 邏輯 (仿點貨頁版) =======
+    let historyRecords = [];
+    let currentHistoryDate = '';
+    let currentHistoryWarehouse = '';
+
+    async function fetchHistory() {
+      const listUl = $('history-item-list');
+      if (listUl) listUl.innerHTML = '<li style="justify-content:center; color:#86868b; padding: 20px 0;">⏳ 正在读取历史数据...</li>';
+      
+      try {
+        const res = await fetch(`${API_URL}/history`);
+        const data = await res.json();
+        if (data.success) {
+          historyRecords = data.history || [];
+          if (historyRecords.length === 0) {
+            $('history-date-selector').innerHTML = '';
+            $('history-warehouse-selector').innerHTML = '';
+            $('history-list-title').textContent = '历史记录';
+            $('history-item-count').textContent = '0 条';
+            $('history-item-list').innerHTML = '<li style="justify-content:center; color:#86868b; padding: 30px 0;">暂无历史记录</li>';
+            return;
+          }
+
+          // 預設選中最新的一天
+          if (!currentHistoryDate || !historyRecords.some(d => d.dateStr === currentHistoryDate)) {
+            currentHistoryDate = historyRecords[0].dateStr;
+          }
+          
+          renderHistoryDates();
+          renderHistoryWarehouses();
+          renderHistoryItems();
+        }
+      } catch (e) {
+        if ($('history-item-list')) {
+          $('history-item-list').innerHTML = '<li style="justify-content:center; color:#ff3b30; padding: 20px 0;">❌ 读取历史失败，请检查网络</li>';
+        }
+      }
+    }
+
+    // 渲染日期切換按鈕
+    function renderHistoryDates() {
+      const ds = $('history-date-selector');
+      ds.innerHTML = '';
+      historyRecords.forEach(rec => {
+        const btn = document.createElement('button');
+        const isActive = rec.dateStr === currentHistoryDate;
+        btn.className = 'wh-btn' + (isActive ? ' active' : '');
+        btn.style.flex = '0 0 auto';
+        btn.style.minWidth = '110px';
+        btn.style.fontSize = '14px';
+        btn.textContent = '📅 ' + rec.dateStr;
+        btn.onclick = () => {
+          currentHistoryDate = rec.dateStr;
+          renderHistoryDates();
+          renderHistoryWarehouses();
+          renderHistoryItems();
+        };
+        ds.appendChild(btn);
+      });
+    }
+
+    // 渲染該日期下的倉庫選擇器
+    function renderHistoryWarehouses() {
+      const ws = $('history-warehouse-selector');
+      ws.innerHTML = '';
+      const dayData = historyRecords.find(d => d.dateStr === currentHistoryDate);
+      if (!dayData) return;
+
+      // 提取這一天所有有紀錄的倉庫
+      const dayWarehouses = [...new Set(dayData.items.map(it => it.warehouse || '未歸類'))];
+      dayWarehouses.sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }));
+
+      // 預設選中第一個倉庫
+      if (!dayWarehouses.includes(currentHistoryWarehouse)) {
+        currentHistoryWarehouse = dayWarehouses[0] || '';
+      }
+
+      dayWarehouses.forEach(wh => {
+        const btn = document.createElement('button');
+        btn.className = 'wh-btn' + (wh === currentHistoryWarehouse ? ' active' : '');
+        btn.textContent = wh;
+        btn.onclick = () => {
+          currentHistoryWarehouse = wh;
+          renderHistoryWarehouses();
+          renderHistoryItems();
+        };
+        ws.appendChild(btn);
+      });
+    }
+
+    // 渲染貨物列表 (外觀與點貨頁一致)
+    function renderHistoryItems() {
+      const dayData = historyRecords.find(d => d.dateStr === currentHistoryDate);
+      const filtered = dayData ? dayData.items.filter(it => (it.warehouse || '未歸類') === currentHistoryWarehouse) : [];
+
+      $('history-list-title').textContent = `${currentHistoryWarehouse} · 历史记录 (${currentHistoryDate})`;
+      $('history-item-count').textContent = filtered.length + ' 条';
+
+      const ul = $('history-item-list');
+      ul.innerHTML = '';
+
+      if (filtered.length === 0) {
+        ul.innerHTML = '<li style="justify-content:center; color:#86868b; padding: 20px 0;">当前仓库无记录</li>';
+        return;
+      }
+
+      filtered.forEach((it, index) => {
+        const li = document.createElement('li');
+        const opText = it.operator ? `<span style="color:#86868b; font-size:12px; margin-left:8px;">[${escapeHtml(it.operator)}]</span>` : '';
+        const qtyVal = (it.qty !== '' && it.qty != null) ? it.qty : '-';
+        const unitVal = it.unit || '-';
+
+        li.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 8px; padding: 4px 0;">
+            <!-- 左側：序號與品名 -->
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; flex: 1;">
+              <span style="background: #e5e5ea; color: #86868b; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 8px; margin-right: 4px; min-width: 24px; text-align: center;">
+                ${index + 1}
+              </span>
+              <span style="font-weight: bold; font-size: 16px; word-break: break-all;">
+                ${escapeHtml(it.name)}
+              </span>
+              ${opText}
+            </div>
+            
+            <!-- 右側：數量與單位標籤 -->
+            <div style="display: flex; gap: 6px; flex-shrink: 0; align-items: center;">
+              <div style="padding: 8px 12px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; color: #1976d2; font-size: 14px; font-weight: bold; min-width: 60px; text-align: center;">
+                ${escapeHtml(String(qtyVal))}
+              </div>
+              <div style="padding: 8px 12px; background: #f5f5f7; border: 1px solid #d1d1d6; border-radius: 8px; color: #1d1d1f; font-size: 14px; font-weight: bold; min-width: 60px; text-align: center;">
+                ${escapeHtml(unitVal)}
+              </div>
+            </div>
+          </div>
+        `;
+        ul.appendChild(li);
+      });
+    }
+
+    // ======= 人员管理 JS 逻辑 =======
+    async function fetchUsers() {
+      try {
+        const res = await fetch(`${API_URL}/users`);
+        const data = await res.json();
+        if (data.success) {
+          const ul = $('user-list');
+          ul.innerHTML = '';
+          data.users.forEach(u => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <div>
+                <b>${u.username}</b> - ${escapeHtml(u.name)} (${escapeHtml(u.nickname)}) 
+                <span style="color:#007aff; font-size:12px; border:1px solid #007aff; padding:2px 4px; border-radius:4px; margin-left:8px;">${u.role}</span>
+              </div>
+              <button class="delete-btn" onclick="deleteUser('${u.username}')">✕</button>
+            `;
+            ul.appendChild(li);
+          });
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    window.deleteUser = async function(username) {
+      if (!confirm('确定删除该人员吗？')) return;
+      await fetch(`${API_URL}/users/${username}`, { method: 'DELETE' });
+      fetchUsers();
+    };
+
+    $('save-user-btn').addEventListener('click', async () => {
+      const username = $('new-user-id').value.trim();
+      const name = $('new-user-name').value.trim();
+      const nickname = $('new-user-nick').value.trim();
+      const password = $('new-user-pw').value;
+      const role = $('new-user-role').value;
+      
+      if (!username || !name || !nickname) { showToast('请填写完整信息'); return; }
+
+      await fetch(`${API_URL}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, name, nickname, role })
+      });
+      
+      $('new-user-id').value = '';
+      $('new-user-name').value = '';
+      $('new-user-nick').value = '';
+      $('new-user-pw').value = '';
+      showToast('✅ 已保存');
+      fetchUsers();
+    });
+
+// ======= 歷史記錄：導出當日 Excel =======
+    $('export-history-btn').addEventListener('click', () => {
+      if (!currentHistoryDate) {
+        showToast('⚠️ 没有选择日期');
+        return;
+      }
+      
+      const dayData = historyRecords.find(d => d.dateStr === currentHistoryDate);
+      if (!dayData || !dayData.items || dayData.items.length === 0) {
+        showToast('⚠️ 当日无数据可导出');
+        return;
+      }
+
+      // 提取當天所有的倉庫 (確保欄位對齊)
+      const dayWarehouses = [...new Set(dayData.items.map(it => it.warehouse || '未歸類'))];
+      dayWarehouses.sort((a, b) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' }));
+      
+      let pointData = {};
+      
+      // 計算並套用最新的 倍率 與 ITEM CODE
+      dayData.items.forEach(it => {
+        const name = it.name || '';
+        const unit = it.unit || '';
+        const rawQty = parseFloat(it.qty) || 0;
+        
+        if (!name || rawQty === 0) return; // 略過沒名字或數量的
+        
+        const code = itemCodes[name] || name; // 如果沒有CODE，預設用原名
+        const rate = itemRates[name + '_' + unit] !== undefined ? itemRates[name + '_' + unit] : 1;
+        const qty = rawQty * rate;
+        const wh = it.warehouse || '未歸類';
+        
+        const key = code.trim().toUpperCase();
+        if (!pointData[key]) pointData[key] = { originalCode: code.trim(), warehouses: {} };
+        if (!pointData[key].warehouses[wh]) pointData[key].warehouses[wh] = 0;
+        pointData[key].warehouses[wh] += qty;
+      });
+
+      let oldCodes = [];
+      let newCodes = [];
+
+      allItems.forEach(item => {
+        const key = item.toUpperCase();
+        oldCodes.push(key);
+      });
+      oldCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+      Object.keys(pointData).forEach(key => {
+        if (!originalItemsSet.has(key)) {
+          newCodes.push(key);
+        }
+      });
+      newCodes.sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+      const finalCodes = oldCodes.concat(newCodes);
+      
+      let allItemMap = new Map();
+      allItems.forEach(item => allItemMap.set(item.toUpperCase(), item));
+      Object.keys(pointData).forEach(key => {
+        if (!allItemMap.has(key)) allItemMap.set(key, pointData[key].originalCode);
+      });
+
+      if (Object.keys(pointData).length === 0) {
+        showToast('⚠️ 当日没有可导出的有效数据');
+        return;
+      }
+
+      // 開始組裝與轉換頁一模一樣的 Excel 原始碼
+      let excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office"
+              xmlns:x="urn:schemas-microsoft-com:office:excel"
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>历史点货_${currentHistoryDate}</x:Name>
+                  <x:WorksheetOptions>
+                    <x:DisplayGridlines/>
+                    <x:DoNotDisplayGridlines>False</x:DoNotDisplayGridlines>
+                  </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <style>
+            table { border-collapse: collapse; mso-displayed-decimal-separator:"\\."; mso-displayed-thousand-separator:"\\,"; }
+            th, td { border: 0.5pt solid #cccccc; padding: 4px 8px; font-family: Arial, sans-serif; font-size: 11pt; white-space: nowrap; }
+            th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+            .col-item { text-align: left; min-width: 120px; font-weight: bold; }
+            .col-num { text-align: right; min-width: 60px; mso-number-format:"General"; }
+            .col-total { text-align: right; min-width: 60px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th class="col-item">Item</th>
+      `;
+      
+      // 表頭：依照當天有的倉庫印出
+      dayWarehouses.forEach(w => excelContent += `<th class="col-num">${escapeHtml(w)}</th>`);
+      excelContent += `<th class="col-total">Total</th></tr></thead><tbody>`;
+
+      // 內容填寫
+      finalCodes.forEach(key => {
+        const isNew = !originalItemsSet.has(key);
+        const displayCode = allItemMap.get(key);
+        const whData = pointData[key] ? pointData[key].warehouses : {};
+        
+        const colorStyle = isNew ? 'color: red;' : '';
+        const fontStyle = isNew ? 'font-weight: bold;' : '';
+
+        let rowHTML = `<tr><td class="col-item" style="${colorStyle} ${fontStyle}">${escapeHtml(displayCode)}</td>`;
+        let total = 0;
+        
+        dayWarehouses.forEach(wh => {
+          const q = whData[wh] || 0;
+          rowHTML += `<td class="col-num" style="${colorStyle}">${q > 0 ? q : ''}</td>`;
+          total += q;
+        });
+        
+        rowHTML += `<td class="col-total" style="${colorStyle}">${total > 0 ? total : ''}</td></tr>`;
+        excelContent += rowHTML;
+      });
+
+      excelContent += `</tbody></table></body></html>`;
+
+      // 直接觸發下載 (無須預覽)
+      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      link.href = url;
+      // 檔名會帶上選擇的日期，例如：历史点货_2026-11-04.xls
+      link.download = `历史点货_${currentHistoryDate}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`✅ 已成功导出 ${currentHistoryDate} 的 Excel`);
+    });
+
+// 👇 新增：当页面重新变为可见时（切换Tab或切回窗口），立刻同步
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        fetchLocks(); // 立刻刷新锁定状态
+        if ($('page-convert').classList.contains('active')) {
+          autoSyncCloudData(); // 如果当前在转换页，立刻拉取最新数据
+        }
+      }
+    });
+
+    // 👇 新增：鼠标点击页面任何地方时（说明你在操作），如果隔了5秒没同步，就顺手同步一下
+    let lastFocusSync = 0;
+    window.addEventListener('focus', () => {
+      const now = Date.now();
+      if (now - lastFocusSync > 5000) { // 防止疯狂触发
+        lastFocusSync = now;
+        fetchLocks();
+        if ($('page-convert').classList.contains('active')) {
+          autoSyncCloudData();
+        }
+      }
+    });
+    })();
+
   </script>
 </body>
 </html>
